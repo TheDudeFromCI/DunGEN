@@ -28,6 +28,10 @@ class PathLayer(RenderLayer):
         """See RenderLayer for docs."""
 
         room = dungeon.rooms[0]
+
+        self.draw_starting_triangle(room, draw)
+        self.draw_ending_circle(dungeon.rooms[-1], draw)
+
         mainPath = [((room.pixelX + room.pixelEndX) / 2,
                      (room.pixelY + room.pixelEndY) / 2)]
 
@@ -43,6 +47,64 @@ class PathLayer(RenderLayer):
             room = next
 
         draw.line(mainPath, fill=self.pathColor, width=3)
+
+    def draw_starting_triangle(self, room: DungeonRoom, draw: ImageDraw) -> None:
+        """
+        Internal function for rendering the starting triangle arrow.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to draw the arrow in.
+
+        draw: ImageDraw
+            The drawing handler.
+        """
+
+        c = ((room.pixelX + room.pixelEndX) / 2,
+             (room.pixelY + room.pixelEndY) / 2)
+        size = 8
+
+        points = []
+
+        d = room.direction_to(room.pathNext)
+        if d == 0:
+            points.append((c[0] + size, c[1] - size))
+            points.append((c[0] + size, c[1] + size))
+            points.append((c[0] - size, c[1]))
+        if d == 1:
+            points.append((c[0] - size, c[1] + size))
+            points.append((c[0] + size, c[1] + size))
+            points.append((c[0], c[1] - size))
+        if d == 2:
+            points.append((c[0] - size, c[1] + size))
+            points.append((c[0] - size, c[1] - size))
+            points.append((c[0] + size, c[1]))
+        if d == 3:
+            points.append((c[0] + size, c[1] - size))
+            points.append((c[0] - size, c[1] - size))
+            points.append((c[0], c[1] + size))
+
+        draw.polygon(points, fill=self.pathColor)
+
+    def draw_ending_circle(self, room: DungeonRoom, draw: ImageDraw) -> None:
+        """
+        Internal function for rendering the ending circle.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to draw the circle in.
+
+        draw: ImageDraw
+            The drawing handler.
+        """
+
+        c = ((room.pixelX + room.pixelEndX) / 2,
+             (room.pixelY + room.pixelEndY) / 2)
+
+        rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
+        draw.ellipse(rect, fill=self.pathColor)
 
     def draw_side_path(self, room: DungeonRoom, draw: ImageDraw) -> None:
         """
