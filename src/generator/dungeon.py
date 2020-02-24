@@ -1,7 +1,4 @@
-import subprocess
-import os
-import sys
-from config import config
+from generator.config import config
 from random import randrange as rand
 from random import shuffle
 from math import sqrt, floor
@@ -208,12 +205,3 @@ def layout_rooms(dungeon):
 
         dungeon.rooms = []
         dungeon.keys = []
-
-
-if __name__ == '__main__':
-    dungeon = gen_map()
-    dungeon.name = 'The Sewers'
-    dungeon.index = 2
-
-    import painter
-    painter.paint(dungeon)

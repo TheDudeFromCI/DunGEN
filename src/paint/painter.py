@@ -1,8 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont
-from path_layer import draw_path_layer
-from key_layer import draw_keys_layer
-from base_layer import draw_base_layer
-from number_layer import draw_numbers_layer
+from paint.path_layer import draw_path_layer
+from paint.key_layer import draw_keys_layer
+from paint.base_layer import draw_base_layer
+from paint.number_layer import draw_numbers_layer
 import sys
 import os
 import subprocess
@@ -42,15 +42,13 @@ def open_image(filename):
     subprocess.run([open_cmd, filename], check=True)
 
 
-def paint(dungeon):
+def create_layered_image(dungeon):
     imageWidth, imageHeight = plot_map(dungeon)
 
     img = Image.new('RGB', (imageWidth, imageHeight), color=BACKGROUND)
     layer2 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
     layer3 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
     layer4 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
-
-    #layer2 = layer3 = layer4 = img
 
     draw_base_layer(dungeon, ImageDraw.Draw(img))
     draw_numbers_layer(dungeon, ImageDraw.Draw(layer2))
@@ -59,4 +57,5 @@ def paint(dungeon):
 
     img.save('dungeon.tiff', save_all=True, append_images=[
         layer2, layer3, layer4])
-    # open_image('dungeon.tiff')
+
+    open_image('dungeon.tiff')
