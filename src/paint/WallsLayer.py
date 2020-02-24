@@ -1,17 +1,7 @@
 from paint.painter import RenderLayer
 from generator.dungeon import Dungeon
 from PIL import Image, ImageDraw
-
-
-def draw_hollow_rect(draw, rect, color):
-    """
-    Fills a rectanglular area with a given color, but erases the inside,
-    leaving a 2 pixel outline with a completely transparent inside.
-    """
-
-    draw.rectangle(rect, fill=color)
-    rect = (rect[0] + 2, rect[1] + 2, rect[2] - 2, rect[3] - 2)
-    draw.rectangle(rect, fill=(0, 0, 0,))
+from paint.Utils import draw_hollow_rect
 
 
 class WallsLayer(RenderLayer):
