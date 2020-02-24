@@ -3,10 +3,17 @@ from paint.painter import PainterConfig, create_image
 from paint.FillLayer import FillLayer
 from paint.WallsLayer import WallsLayer
 from paint.RoomNumbersLayer import RoomNumbersLayer
+from paint.KeysLayer import KeysLayer
 from PIL import ImageFont
 import sys
 import os
 import subprocess
+
+BACKGROUND_COLOR = (13, 13, 13)
+WALL_COLOR = (77, 77, 77)
+ROOM_NUMBER_COLOR = (48, 48, 48)
+LOCKED_DOOR_COLOR = (96, 0, 0)
+KEY_COLOR = (128, 96, 0)
 
 
 def open_image(filename: str) -> None:
@@ -29,9 +36,13 @@ if __name__ == '__main__':
     subFont = ImageFont.truetype('Seagram tfb.ttf', 16)
 
     config = PainterConfig()
-    config.add_render_layer(FillLayer((13, 13, 23)))
-    config.add_render_layer(WallsLayer(32, (77, 77, 77), (96, 0, 0)))
-    config.add_render_layer(RoomNumbersLayer(subFont, (48, 48, 48)))
+    config.layeredImage = False
+
+    config.add_render_layer(FillLayer(BACKGROUND_COLOR))
+
+    config.add_render_layer(WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR))
+    config.add_render_layer(RoomNumbersLayer(subFont, ROOM_NUMBER_COLOR))
+    config.add_render_layer(KeysLayer(KEY_COLOR, 8))
 
     create_image(dungeon, config)
     open_image('Dungeon.tiff')

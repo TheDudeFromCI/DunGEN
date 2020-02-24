@@ -16,7 +16,7 @@ def draw_hollow_rect(draw, rect, color):
 
 class WallsLayer(RenderLayer):
     """
-    The DrawRooms step is used to reender the walls doorways which define
+    The DrawRooms step is used to render the walls doorways which define
     the base shape of the dungeon.
     """
 
@@ -45,7 +45,7 @@ class WallsLayer(RenderLayer):
             rect = (room.pixelX, room.pixelY, room.pixelEndX, room.pixelEndY)
             draw_hollow_rect(draw, rect, self.wallColor)
 
-            doorStart = (rect[2] + rect[0] - self.doorSize) / 2
+            doorStart = (rect[2] - rect[0] - self.doorSize) / 2
             doorEnd = doorStart + self.doorSize
 
             if room.doors[0]:
@@ -73,7 +73,7 @@ class WallsLayer(RenderLayer):
                 continue
 
             rect = (room.pixelX, room.pixelY, room.pixelEndX, room.pixelEndY)
-            doorStart = (rect[2] + rect[0] - self.doorSize) / 2
+            doorStart = (rect[2] - rect[0] - self.doorSize) / 2
             doorEnd = doorStart + self.doorSize
 
             if room.lockedDoors[0]:

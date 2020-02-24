@@ -155,11 +155,8 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
         layer.render_layer(dungeon, img, draw)
 
     if not config.layeredImage:
-        img = images[0]
-        draw = ImageDraw.Draw(img)
-
         for i in range(1, len(images)):
-            draw.bitmap((0, 0), images[i])
+            images[0] = Image.alpha_composite(images[0], images[i])
 
     images[0].save(config.imageName, save_all=config.layeredImage,
                    append_images=images[1:])

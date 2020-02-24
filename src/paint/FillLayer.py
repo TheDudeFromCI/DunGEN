@@ -3,7 +3,7 @@ from generator.dungeon import Dungeon
 from PIL import Image, ImageDraw
 
 
-class fillLayer(RenderLayer):
+class FillLayer(RenderLayer):
     """
     The FillStep operation simply fills the image with a given color.
     Often used for setting the background color.
