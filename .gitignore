@@ -1,4 +1,4 @@
 *.tiff
-*.tff
+*.ttf
 
 **/__pycache__
