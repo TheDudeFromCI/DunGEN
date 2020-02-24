@@ -1,61 +1,67 @@
-from PIL import Image, ImageDraw, ImageFont
-from paint.path_layer import draw_path_layer
-from paint.key_layer import draw_keys_layer
-from paint.base_layer import draw_base_layer
-from paint.number_layer import draw_numbers_layer
-import sys
-import os
-import subprocess
-
-ROOM_SIZE = 128
-BUFFER_SIZE = 64
-HEADER_SIZE = 64
-BACKGROUND = (13, 13, 23)
+from PIL import Image, ImageDraw
+from generator.dungeon import Dungeon
+from paint.config import PainterConfig
+from typing import Tuple
 
 
-def plot_map(dungeon):
+def plot_map(dungeon: Dungeon, config: PainterConfig) -> Tuple[int, int]:
     bounds = dungeon.bounds()
-    imageWidth = (bounds[2] - bounds[0] + 1) * ROOM_SIZE + BUFFER_SIZE * 2
-    imageHeight = (bounds[3] - bounds[1] + 1) * \
-        ROOM_SIZE + BUFFER_SIZE * 2 + HEADER_SIZE
+
+    roomSize = config.roomSize
+    headerSize = config.headerSize
+
+    imageWidth = (bounds[2] - bounds[0] + 3) * roomSize
+    imageHeight = (bounds[3] - bounds[1] + 3) * roomSize + headerSize
 
     for roomIndex, room in enumerate(dungeon.rooms):
         room.index = roomIndex
-        room.pixelX = (room.x - bounds[0]) * ROOM_SIZE + BUFFER_SIZE
-        room.pixelY = (room.y - bounds[1]) * \
-            ROOM_SIZE + BUFFER_SIZE + HEADER_SIZE
+        room.pixelX = (room.x - bounds[0] + 1) * roomSize
+        room.pixelY = (room.y - bounds[1] + 1) * roomSize + headerSize
 
-        room.pixelEndX = room.pixelX + ROOM_SIZE - 1
-        room.pixelEndY = room.pixelY + ROOM_SIZE - 1
+        room.pixelEndX = room.pixelX + roomSize - 1
+        room.pixelEndY = room.pixelY + roomSize - 1
 
     return imageWidth, imageHeight
 
 
-def open_image(filename):
-    open_cmd = 'open'
-    if sys.platform.startswith('linux'):
-        open_cmd = 'xdg-open'
-    if sys.platform.startswith('win32'):
-        open_cmd = 'start'
+def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
+    """Creates and saves an image of the given dungeon.
 
-    filename = os.getcwd() + os.path.sep + filename
-    subprocess.run([open_cmd, filename], check=True)
+    This function can be used to crate an image of a dungeon. This
+    process works by using the steps defined in the config to generate
+    layers of a image, defining different properties of the map. These
+    layers can then be compressed into a single layer when saved or
+    saved as a layered image. If the list of steps in the config are
+    empty, nothing happens.
 
+    Parameters
+    ----------
+    dungeon : Dungeon
+        The dungeon to create an image of.
 
-def create_layered_image(dungeon):
-    imageWidth, imageHeight = plot_map(dungeon)
+    config : PainterConfig
+        A config specifying how the image should be rendered.
+    """
 
-    img = Image.new('RGB', (imageWidth, imageHeight), color=BACKGROUND)
-    layer2 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
-    layer3 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
-    layer4 = Image.new('RGBA', (imageWidth, imageHeight), color=None)
+    if len(config.steps) == 0:
+        return
 
-    draw_base_layer(dungeon, ImageDraw.Draw(img))
-    draw_numbers_layer(dungeon, ImageDraw.Draw(layer2))
-    draw_keys_layer(dungeon, ImageDraw.Draw(layer3))
-    draw_path_layer(dungeon, ImageDraw.Draw(layer4))
+    imageWidth, imageHeight = plot_map(dungeon, config)
 
-    img.save('dungeon.tiff', save_all=True, append_images=[
-        layer2, layer3, layer4])
+    images = []
+    for step in config.steps:
+        img = Image.new('RGBA', (imageWidth, imageHeight), color=None)
+        images.append(img)
 
-    open_image('dungeon.tiff')
+        draw = ImageDraw.Draw(img)
+        step.run(dungeon, img, draw)
+
+    if not config.layeredImage:
+        img = images[0]
+        draw = ImageDraw.Draw(img)
+
+        for i in range(1, len(images)):
+            draw.bitmap((0, 0), images[i])
+
+    images[0].save(config.imageName, save_all=config.layeredImage,
+                   append_images=images[1:])
