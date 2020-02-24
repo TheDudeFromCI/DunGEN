@@ -1,7 +1,7 @@
 import subprocess
 import os
 import sys
-from dungeon_config import config
+from config import config
 from random import randrange as rand
 from random import shuffle
 from math import sqrt, floor
