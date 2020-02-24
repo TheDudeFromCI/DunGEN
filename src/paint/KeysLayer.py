@@ -29,8 +29,6 @@ class KeysLayer(RenderLayer):
 
         for key in dungeon.keys:
             keyRoom = key['Key Location']
-            lockRoom = key['Locked Room']
-            lockDoor = key['Locked Door']
 
             keyX = (keyRoom.pixelX + keyRoom.pixelEndX) / 2
             keyY = (keyRoom.pixelY + keyRoom.pixelEndY) / 2
@@ -38,20 +36,3 @@ class KeysLayer(RenderLayer):
             rect = (keyX - self.keyRadius, keyY - self.keyRadius,
                     keyX + self.keyRadius, keyY + self.keyRadius)
             draw.ellipse(rect, fill=self.keyColor)
-
-            if lockDoor == 0:
-                lockX = lockRoom.pixelX
-            elif lockDoor == 2:
-                lockX = lockRoom.pixelEndX
-            else:
-                lockX = (lockRoom.pixelX + lockRoom.pixelEndX) / 2
-
-            if lockDoor == 1:
-                lockY = lockRoom.pixelY
-            elif lockDoor == 3:
-                lockY = lockRoom.pixelEndY
-            else:
-                lockY = (lockRoom.pixelY + lockRoom.pixelEndY) / 2
-
-            draw_dotted_line(draw, (lockX, lockY), (keyX, keyY),
-                             10, self.keyColor, 3)
