@@ -2,3 +2,5 @@
 *.ttf
 
 **/__pycache__
+
+*.code-workspace
