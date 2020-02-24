@@ -4,8 +4,23 @@ from generator.dungeon import Dungeon
 from PIL import Image, ImageDraw
 
 
-class RoomNumbersStep(RenderLayer):
-    def __init__(self, font, textColor):
+class RoomNumbersLayer(RenderLayer):
+    """
+    The layer draws the index number of each room in the top left
+    corner of the room.
+    """
+
+    def __init__(self, font: ImageFont, textColor):
+        """
+        Parameters
+        ----------
+        font: ImageFont
+            The font to use when drawing the text.
+
+        textColor
+            The color to use when drawing the text.
+        """
+
         self.font = font
         self.textColor = textColor
 

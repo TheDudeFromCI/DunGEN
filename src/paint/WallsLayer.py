@@ -14,7 +14,7 @@ def draw_hollow_rect(draw, rect, color):
     draw.rectangle(rect, fill=(0, 0, 0,))
 
 
-class DrawRoomsStep(RenderLayer):
+class WallsLayer(RenderLayer):
     """
     The DrawRooms step is used to reender the walls doorways which define
     the base shape of the dungeon.

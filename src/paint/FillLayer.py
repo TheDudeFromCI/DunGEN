@@ -3,13 +3,20 @@ from generator.dungeon import Dungeon
 from PIL import Image, ImageDraw
 
 
-class FillStep(RenderLayer):
+class fillLayer(RenderLayer):
     """
     The FillStep operation simply fills the image with a given color.
     Often used for setting the background color.
     """
 
     def __init__(self, color):
+        """
+        Parameters
+        ----------
+        color
+            The color to fill the image with.
+        """
+
         self.color = color
 
     def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
