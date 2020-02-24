@@ -1,7 +1,7 @@
 from paint.painter import RenderLayer
 from generator.dungeon import Dungeon, DungeonRoom
 from PIL import Image, ImageDraw
-from paint.Utils import draw_dotted_line
+from paint.Utils import draw_dotted_line, draw_hollow_rect
 
 
 class PathLayer(RenderLayer):
@@ -28,10 +28,6 @@ class PathLayer(RenderLayer):
         """See RenderLayer for docs."""
 
         room = dungeon.rooms[0]
-
-        self.draw_starting_triangle(room, draw)
-        self.draw_ending_circle(dungeon.rooms[-1], draw)
-
         mainPath = [((room.pixelX + room.pixelEndX) / 2,
                      (room.pixelY + room.pixelEndY) / 2)]
 
@@ -47,6 +43,9 @@ class PathLayer(RenderLayer):
             room = next
 
         draw.line(mainPath, fill=self.pathColor, width=3)
+
+        self.draw_starting_triangle(dungeon.rooms[0], draw)
+        self.draw_ending_square(dungeon.rooms[-1], draw)
 
     def draw_starting_triangle(self, room: DungeonRoom, draw: ImageDraw) -> None:
         """
@@ -87,7 +86,7 @@ class PathLayer(RenderLayer):
 
         draw.polygon(points, fill=self.pathColor)
 
-    def draw_ending_circle(self, room: DungeonRoom, draw: ImageDraw) -> None:
+    def draw_ending_square(self, room: DungeonRoom, draw: ImageDraw) -> None:
         """
         Internal function for rendering the ending circle.
 
@@ -104,7 +103,7 @@ class PathLayer(RenderLayer):
              (room.pixelY + room.pixelEndY) / 2)
 
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
-        draw.ellipse(rect, fill=self.pathColor)
+        draw_hollow_rect(draw, rect, self.pathColor, thickness=3)
 
     def draw_side_path(self, room: DungeonRoom, draw: ImageDraw) -> None:
         """
@@ -136,6 +135,6 @@ class PathLayer(RenderLayer):
 
         for i in range(len(sidePath) - 1):
             draw_dotted_line(draw, sidePath[i],
-                             sidePath[i + 1], 5, self.pathColor, 1)
+                             sidePath[i + 1], 5, self.pathColor, 2)
 
         return lastRoom

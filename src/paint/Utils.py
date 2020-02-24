@@ -44,10 +44,26 @@ def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
         pos = p2
 
 
-def draw_hollow_rect(draw, rect, color):
+def draw_hollow_rect(draw: ImageDraw, rect: Tuple[int, int, int, int], color, thickness: int = 2) -> None:
     """
     Fills a rectanglular area with a given color, but erases the inside,
-    leaving a 2 pixel outline with a completely transparent inside.
+    leaving an outline with a completely transparent inside.
+
+    Parameters
+    ----------
+    draw: ImageDraw
+        The drawing handler.
+
+    rect: Tuple[int, int, int, int]
+        The bounds of the rectangle. The bounds are in the format
+        (x1, y1, x2, y2), where the points define the edge coordinates.
+        The second point lies outside of the rectangle bounds.
+
+    color
+        The color of the rectangle.
+
+    thickness: int
+        How thick to make the line in pixels. Defaults to 2.
     """
 
     draw.rectangle(rect, fill=color)
