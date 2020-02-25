@@ -1,10 +1,10 @@
-from dungeon.generator import gen_map
 from paint.painter import PainterConfig, create_image
 from PIL import ImageFont
 import sys
 import os
 import subprocess
 
+from dungeon.generator import gen_map
 
 from paint.FillLayer import FillLayer
 from paint.WallsLayer import WallsLayer

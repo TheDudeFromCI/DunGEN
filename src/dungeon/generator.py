@@ -1,29 +1,9 @@
-from dungeon.config import config
-from dungeon.DungeonRoom import DungeonRoom
-from random import randrange as rand
-from random import shuffle
+from random import randrange as rand, shuffle
 from math import sqrt, floor
 
-
-class Dungeon:
-    def __init__(self):
-        self.rooms = []
-        self.keys = []
-
-    def add_room(self, room):
-        self.rooms.append(room)
-
-    def bounds(self):
-        minX = minY = float("inf")
-        maxX = maxY = float("-inf")
-
-        for room in self.rooms:
-            minX = min(minX, room.x)
-            maxX = max(maxX, room.x)
-            minY = min(minY, room.y)
-            maxY = max(maxY, room.y)
-
-        return (minX, minY, maxX, maxY)
+from dungeon.config import config
+from dungeon.Dungeon import Dungeon
+from dungeon.DungeonRoom import DungeonRoom
 
 
 def gen_map():
