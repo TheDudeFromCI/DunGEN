@@ -104,7 +104,7 @@ class PathLayer(RenderLayer):
              (room.pixelY + room.pixelEndY) / 2)
 
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
-        draw_hollow_rect(draw, rect, self.pathColor, thickness=3)
+        draw_hollow_rect(draw, rect, self.pathColor, thickness=4)
 
     def draw_side_path(self, room: DungeonRoom, draw: ImageDraw) -> None:
         """
