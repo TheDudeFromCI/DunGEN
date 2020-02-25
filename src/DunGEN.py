@@ -6,7 +6,7 @@ implemented in the final product.
 """
 
 from typing import Tuple, Optional, Callable, List
-from random import shuffle, randrange as rand
+from random import shuffle, randrange as rand, random
 
 
 class GeneratorError(Exception):
@@ -521,12 +521,30 @@ def assign_difficulties(dungeon: Dungeon) -> None:
         The dungeon to process.
     """
 
-    regionDiff = 0
+    diff = 0
     currentRegion = 0
+    regionValues = [0] * (dungeon.region_count() + 1)
     for room in dungeon.rooms:
         if room.region != currentRegion:
             currentRegion = room.region
-            regionDiff = 0
+            regionValues[currentRegion] = diff
 
-        room.difficulty = regionDiff
-        regionDiff += 1
+        room.difficulty = diff
+        diff += 1
+
+    diff -= 1
+    regionValues[-1] = diff
+    c = 2 / 3
+
+    for room in dungeon.rooms:
+        x1 = regionValues[room.region]
+        x2 = regionValues[room.region + 1]
+        n = room.difficulty
+
+        d = (((n - x1) / (x2 - x1)) ** 2) * (x2 - c * x1) + c * x1
+        d /= diff
+
+        d += random() * 0.03 - 0.015
+        d = max(0, min(1, d))
+
+        room.difficulty = d

@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageColor
 from typing import Tuple
 from math import sqrt, floor
 from DunGEN import Dungeon, DungeonRoom
@@ -565,3 +565,42 @@ class RegionLayer(RenderLayer):
                     room.pixelEndX, room.pixelEndY)
 
             draw.rectangle(rect, fill=regionColors[room.region])
+
+
+class DifficultyLayer(RenderLayer):
+    """
+    The difficulty layer is used to render a heatmap of difficulty
+    across the dungeon for each room. Difficulty is measured as a range
+    of values between dark blue, meaning a difficulty of 0, to green, to
+    yellow, to dark red meaning a difficulty of 1.
+    """
+
+    def get_gradient_color(self, value: float) -> Tuple[int, int, int]:
+        """
+        A simple function which converts a percentile value to a heatmap
+        color gradient.
+
+        Parameters
+        ----------
+        value: float
+            The percentile.
+
+        Returns
+        -------
+        An RGB color value representing the corresponding color in the
+        heightmap.
+        """
+
+        col = 'hsl(' + str((1 - value) * 240) + ', 100%, 50%)'
+        return ImageColor.getrgb(col)
+
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
+        """See RenderLayer for docs."""
+
+        for room in dungeon.rooms:
+            rect = (room.pixelX, room.pixelY,
+                    room.pixelEndX, room.pixelEndY)
+
+            col = self.get_gradient_color(room.difficulty)
+            draw.rectangle(rect, fill=col)
