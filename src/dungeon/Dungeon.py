@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 from dungeon.DungeonRoom import DungeonRoom
 
 
@@ -56,3 +56,25 @@ class Dungeon:
             maxY = max(maxY, room.y)
 
         return (minX, minY, maxX, maxY)
+
+    def get_room_at(self, x: int, y: int) -> Optional[DungeonRoom]:
+        """
+        Gets the room at the given coordinates.
+
+        Parameters
+        ----------
+        x: int
+            The x position of the room.
+
+        y: int
+            The y position of the room.
+
+        Returns
+        -------
+        The room at the given position, or None if there is no room
+        with the given coords.
+        """
+
+        for room in self.rooms:
+            if room.x == x and room.y == y:
+                return room

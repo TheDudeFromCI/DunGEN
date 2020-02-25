@@ -4,7 +4,8 @@ import sys
 import os
 import subprocess
 
-from dungeon.generator import gen_map
+from dungeon.generator import \
+    gen_map, GeneratorConfig, RoomType
 
 from paint.FillLayer import FillLayer
 from paint.WallsLayer import WallsLayer
@@ -18,36 +19,73 @@ ROOM_NUMBER_COLOR = (48, 48, 48)
 LOCKED_DOOR_COLOR = (96, 0, 0)
 KEY_COLOR = (128, 96, 0)
 PATH_COLOR = (76, 76, 0)
+ROOM_NUMBER_FONT = ImageFont.truetype('Seagram tfb.ttf', 16)
 
 
 def open_image(filename: str) -> None:
-    open_cmd = 'open'
     if sys.platform.startswith('linux'):
         open_cmd = 'xdg-open'
     if sys.platform.startswith('win32'):
         open_cmd = 'start'
+    if sys.platform.startswith('darwin'):
+        open_cmd = 'open'
 
     filename = os.getcwd() + os.path.sep + filename
     subprocess.run([open_cmd, filename], check=True)
 
 
+def get_dungeon_config():
+    dungeonConfig = GeneratorConfig()
+
+    roomType = RoomType()
+    roomType.name = 'Downward Stairway Entrance'
+    roomType.isEntrance = True
+    dungeonConfig.add_room_type(roomType)
+
+    roomType = RoomType()
+    roomType.name = 'Boss'
+    roomType.isExit = True
+    dungeonConfig.add_room_type(roomType)
+
+    roomType = RoomType()
+    roomType.name = 'Spiked Ball Trap'
+    dungeonConfig.add_room_type(roomType)
+
+    roomType = RoomType()
+    roomType.name = 'Timing Puzzle'
+    dungeonConfig.add_room_type(roomType)
+
+    roomType = RoomType()
+    roomType.name = 'Block Puzzle'
+    dungeonConfig.add_room_type(roomType)
+
+    roomType = RoomType()
+    roomType.name = 'Mini Boss'
+    dungeonConfig.add_room_type(roomType)
+
+    return dungeonConfig
+
+
+def get_painter_config():
+    painterConfig = PainterConfig()
+    painterConfig.layeredImage = False
+
+    painterConfig.layers = [
+        FillLayer(BACKGROUND_COLOR),
+        WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR),
+        RoomNumbersLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR),
+        PathLayer(PATH_COLOR),
+        KeysLayer(KEY_COLOR, 8),
+    ]
+
+    return painterConfig
+
+
 if __name__ == '__main__':
-    dungeon = gen_map()
-    dungeon.name = 'The Sewers'
-    dungeon.index = 2
 
-    mainFont = ImageFont.truetype('Seagram tfb.ttf', 24)
-    subFont = ImageFont.truetype('Seagram tfb.ttf', 16)
+    dungeonConfig = get_dungeon_config()
+    dungeon = gen_map(dungeonConfig)
 
-    config = PainterConfig()
-    config.layeredImage = False
-
-    config.add_render_layer(FillLayer(BACKGROUND_COLOR))
-
-    config.add_render_layer(WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR))
-    config.add_render_layer(RoomNumbersLayer(subFont, ROOM_NUMBER_COLOR))
-    config.add_render_layer(PathLayer(PATH_COLOR))
-    config.add_render_layer(KeysLayer(KEY_COLOR, 8))
-
-    create_image(dungeon, config)
+    painterConfig = get_painter_config()
+    create_image(dungeon, painterConfig)
     open_image('Dungeon.tiff')
