@@ -161,14 +161,27 @@ class DungeonRoom:
         the end. If false, this room must be entered at least once to
         complete the dungeon.
 
-    type:
+    type: RoomType
         The type of room this is. A room type is assigned by the config
         to allow a room to share a set of meta properties for how the
         room should be generated or handled. Multiple rooms may have
         the same type and their type properties shared.
+
+    difficulty: float
+        A value between 0 and 1, inclusive, which represents how
+        difficult the room is. This value is relative to the rest of the
+        dungeon. The starting room of a dungeon always has a value of 0,
+        while the final room always has a value of 1.
+
+    region: int
+        The region index of this room. A region is a group of rooms
+        which can be accessed without needing to pass through a locked
+        door. A room's region number is equal to the smallest number of
+        locked rooms that must be crossed to reach from the starting
+        room.
     """
 
-    def __init__(self, type):
+    def __init__(self, type: RoomType):
         self.x = 0
         self.y = 0
         self.index = 0
@@ -178,6 +191,8 @@ class DungeonRoom:
         self.depth = 0
         self.optional = False
         self.type = type
+        self.difficulty = 0.0
+        self.region = 0
 
     def direction_to(self, room: 'DungeonRoom') -> int:
         """
@@ -285,6 +300,20 @@ class Dungeon:
             if room.x == x and room.y == y:
                 return room
 
+    def region_count(self) -> int:
+        """
+        Counts the total number of regions in this dungeon.
+
+        Returns
+        -------
+        The number of regions.
+        """
+
+        if len(self.rooms) == 0:
+            return 0
+
+        return self.rooms[-1].region + 1
+
 
 def gen_map(config: GeneratorConfig) -> Dungeon:
     """
@@ -308,17 +337,20 @@ def gen_map(config: GeneratorConfig) -> Dungeon:
         dungeon.add_room(room)
         room.depth = 0
 
-        lastRoom = __create_path(dungeon, rand(15, 30), room, config)
+        lastRoom = create_path(dungeon, rand(15, 30), room, config)
         if lastRoom != None:
             break
 
         dungeon.rooms = []
         dungeon.keys = []
 
+    assign_regions(dungeon)
+    assign_difficulties(dungeon)
+
     return dungeon
 
 
-def __shuffle_directions(x: int, y: int) -> List[Tuple[int, int, int]]:
+def shuffle_directions(x: int, y: int) -> List[Tuple[int, int, int]]:
     """
     Creates a list of room positions which touch the given room
     coordates. The list is returned in a randomized order.
@@ -344,8 +376,8 @@ def __shuffle_directions(x: int, y: int) -> List[Tuple[int, int, int]]:
     return directions
 
 
-def __create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
-                  config: GeneratorConfig, depth: int = 0) \
+def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
+                config: GeneratorConfig, depth: int = 0) \
         -> Optional[DungeonRoom]:
     """
     An internal function which generates a random path starting at, but
@@ -388,7 +420,7 @@ def __create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
     keyLocation = None
     while length > 0:
         nextPos = None
-        for direction in __shuffle_directions(room.x, room.y):
+        for direction in shuffle_directions(room.x, room.y):
             if dungeon.get_room_at(direction[0], direction[1]) == None:
                 nextPos = direction
 
@@ -434,8 +466,8 @@ def __create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
 
         if length > 0:
             if rand(12) == 0:
-                branchRoom = __create_path(dungeon, 1, room, config,
-                                           depth=depth + 1)
+                branchRoom = create_path(dungeon, 1, room, config,
+                                         depth=depth + 1)
 
                 if branchRoom == None:
                     return None
@@ -443,8 +475,8 @@ def __create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
                 branchRoom.optional = True
 
             if depth == 0 and rand(4) == 0:
-                branchRoom = __create_path(dungeon, rand(4) + 1, room,
-                                           config, depth=depth + 1)
+                branchRoom = create_path(dungeon, rand(4) + 1, room,
+                                         config, depth=depth + 1)
 
                 if branchRoom == None:
                     return None
@@ -453,3 +485,48 @@ def __create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
                 keyLocation = branchRoom
 
     return room
+
+
+def assign_regions(dungeon: Dungeon) -> None:
+    """
+    Assigns the region values to each room in the dungeon.
+
+    Parameters
+    ----------
+    dungeon: Dungeon
+        The dungeon to process.
+    """
+
+    room = dungeon.rooms[0]
+    region = 0
+    while room != None:
+        room.region = region
+
+        next = room.pathNext
+        if next != None and next.depth < room.depth:
+            region += 1
+
+        room = next
+
+
+def assign_difficulties(dungeon: Dungeon) -> None:
+    """
+    This function is called after a dungeon path is generated to assign
+    the difficult values for each room within the dungeon, based on
+    their position along the path.
+
+    Parameters
+    ----------
+    dungeon: Dungeon
+        The dungeon to process.
+    """
+
+    regionDiff = 0
+    currentRegion = 0
+    for room in dungeon.rooms:
+        if room.region != currentRegion:
+            currentRegion = room.region
+            regionDiff = 0
+
+        room.difficulty = regionDiff
+        regionDiff += 1

@@ -66,6 +66,7 @@ def get_painter_config():
 
     painterConfig.layers = [
         DungeonPainter.FillLayer(BACKGROUND_COLOR),
+        DungeonPainter.RegionLayer(),
         DungeonPainter.WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR),
         DungeonPainter.RoomNumbersLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR),
         DungeonPainter.PathLayer(PATH_COLOR),

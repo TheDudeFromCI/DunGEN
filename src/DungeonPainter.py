@@ -3,6 +3,7 @@ from typing import Tuple
 from math import sqrt, floor
 from DunGEN import Dungeon, DungeonRoom
 from abc import ABCMeta, abstractmethod
+from random import randrange as rand
 
 
 class RenderLayer(metaclass=ABCMeta):
@@ -11,7 +12,8 @@ class RenderLayer(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """
         Renders a single image layer of a dungeon.
 
@@ -165,7 +167,8 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
 
 
 def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
-                     end: Tuple[int, int], length: int, color, width: int):
+                     end: Tuple[int, int], length: int, color,
+                     width: int):
     """
     Draws a dotted line between two points.
 
@@ -181,8 +184,8 @@ def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
         The second end point of the line.
 
     length: int
-        The length, in pixels, of each dashed line segment along the line.
-        This is also used as the number of pixels between dashes.
+        The length, in pixels, of each dashed line segment along the
+        line. This is also used as the number of pixels between dashes.
 
     color
         The color to render the line segments with.
@@ -205,7 +208,8 @@ def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
         pos = p2
 
 
-def draw_hollow_rect(draw: ImageDraw, rect: Tuple[int, int, int, int], color, thickness: int = 2) -> None:
+def draw_hollow_rect(draw: ImageDraw, rect: Tuple[int, int, int, int],
+                     color, thickness: int = 2) -> None:
     """
     Fills a rectanglular area with a given color, but erases the inside,
     leaving an outline with a completely transparent inside.
@@ -229,7 +233,7 @@ def draw_hollow_rect(draw: ImageDraw, rect: Tuple[int, int, int, int], color, th
 
     draw.rectangle(rect, fill=color)
     rect = (rect[0] + 2, rect[1] + 2, rect[2] - 2, rect[3] - 2)
-    draw.rectangle(rect, fill=(0, 0, 0,))
+    draw.rectangle(rect, fill=(0, 0, 0, 0))
 
 
 class FillLayer(RenderLayer):
@@ -248,7 +252,8 @@ class FillLayer(RenderLayer):
 
         self.color = color
 
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         rect = (0, 0, img.size[0], img.size[1])
@@ -275,7 +280,8 @@ class KeysLayer(RenderLayer):
         self.keyColor = keyColor
         self.keyRadius = keyRadius
 
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for key in dungeon.keys:
@@ -313,7 +319,8 @@ class WallsLayer(RenderLayer):
         self.wallColor = wallColor
         self.lockColor = lockColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for room in dungeon.rooms:
@@ -382,7 +389,8 @@ class PathLayer(RenderLayer):
 
         self.pathColor = pathColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         room = dungeon.rooms[0]
@@ -405,7 +413,8 @@ class PathLayer(RenderLayer):
         self.draw_starting_triangle(dungeon.rooms[0], draw)
         self.draw_ending_square(dungeon.rooms[-1], draw)
 
-    def draw_starting_triangle(self, room: DungeonRoom, draw: ImageDraw) -> None:
+    def draw_starting_triangle(self, room: DungeonRoom,
+                               draw: ImageDraw) -> None:
         """
         Internal function for rendering the starting triangle arrow.
 
@@ -444,7 +453,8 @@ class PathLayer(RenderLayer):
 
         draw.polygon(points, fill=self.pathColor)
 
-    def draw_ending_square(self, room: DungeonRoom, draw: ImageDraw) -> None:
+    def draw_ending_square(self, room: DungeonRoom,
+                           draw: ImageDraw) -> None:
         """
         Internal function for rendering the ending circle.
 
@@ -518,7 +528,8 @@ class RoomNumbersLayer(RenderLayer):
         self.font = font
         self.textColor = textColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image, draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for room in dungeon.rooms:
@@ -529,3 +540,28 @@ class RoomNumbersLayer(RenderLayer):
 
             draw.text((room.pixelX + 4, room.pixelY + 2),
                       roomName, fill=self.textColor, font=self.font)
+
+
+class RegionLayer(RenderLayer):
+    """
+    The region layer is used to visualize the different region clusters
+    within a dungeon. Each region is given a random color, and all rooms
+    with that region are filled with that color.
+    """
+
+    def render_layer(self, dungeon: Dungeon, img: Image,
+                     draw: ImageDraw) -> None:
+        """See RenderLayer for docs."""
+
+        regionColors = [0] * dungeon.region_count()
+        for i in range(len(regionColors)):
+            r = rand(128) + 128
+            g = rand(128) + 128
+            b = rand(128) + 128
+            regionColors[i] = (r, g, b)
+
+        for room in dungeon.rooms:
+            rect = (room.pixelX, room.pixelY,
+                    room.pixelEndX, room.pixelEndY)
+
+            draw.rectangle(rect, fill=regionColors[room.region])
