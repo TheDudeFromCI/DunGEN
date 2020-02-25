@@ -1,5 +1,5 @@
 from PIL import Image, ImageDraw
-from dungeon.dungeon import Dungeon
+from dungeon.generator import Dungeon
 from typing import Tuple
 from abc import ABCMeta, abstractmethod
 

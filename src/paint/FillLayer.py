@@ -1,5 +1,5 @@
 from paint.painter import RenderLayer
-from dungeon.dungeon import Dungeon
+from dungeon.generator import Dungeon
 from PIL import Image, ImageDraw
 
 
