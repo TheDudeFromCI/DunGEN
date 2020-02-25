@@ -1,17 +1,11 @@
-from paint.painter import PainterConfig, create_image
 from PIL import ImageFont
 import sys
 import os
 import subprocess
-
-from dungeon.generator import \
-    gen_map, GeneratorConfig, RoomType
-
-from paint.FillLayer import FillLayer
-from paint.WallsLayer import WallsLayer
-from paint.RoomNumbersLayer import RoomNumbersLayer
-from paint.PathLayer import PathLayer
-from paint.KeysLayer import KeysLayer
+import DungeonPainter
+import DunGEN
+from DunGEN import GeneratorConfig, RoomType
+from DungeonPainter import PainterConfig
 
 BACKGROUND_COLOR = (13, 13, 13)
 WALL_COLOR = (77, 77, 77)
@@ -71,11 +65,11 @@ def get_painter_config():
     painterConfig.layeredImage = False
 
     painterConfig.layers = [
-        FillLayer(BACKGROUND_COLOR),
-        WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR),
-        RoomNumbersLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR),
-        PathLayer(PATH_COLOR),
-        KeysLayer(KEY_COLOR, 8),
+        DungeonPainter.FillLayer(BACKGROUND_COLOR),
+        DungeonPainter.WallsLayer(32, WALL_COLOR, LOCKED_DOOR_COLOR),
+        DungeonPainter.RoomNumbersLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR),
+        DungeonPainter.PathLayer(PATH_COLOR),
+        DungeonPainter.KeysLayer(KEY_COLOR, 8),
     ]
 
     return painterConfig
@@ -84,8 +78,8 @@ def get_painter_config():
 if __name__ == '__main__':
 
     dungeonConfig = get_dungeon_config()
-    dungeon = gen_map(dungeonConfig)
+    dungeon = DunGEN.gen_map(dungeonConfig)
 
     painterConfig = get_painter_config()
-    create_image(dungeon, painterConfig)
+    DungeonPainter.create_image(dungeon, painterConfig)
     open_image('Dungeon.tiff')
