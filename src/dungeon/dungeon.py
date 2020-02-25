@@ -1,4 +1,4 @@
-from generator.config import config
+from dungeon.config import config
 from random import randrange as rand
 from random import shuffle
 from math import sqrt, floor

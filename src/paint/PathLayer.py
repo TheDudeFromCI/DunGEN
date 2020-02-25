@@ -1,5 +1,5 @@
 from paint.painter import RenderLayer
-from generator.dungeon import Dungeon, DungeonRoom
+from dungeon.dungeon import Dungeon, DungeonRoom
 from PIL import Image, ImageDraw
 from paint.Utils import draw_dotted_line, draw_hollow_rect
 

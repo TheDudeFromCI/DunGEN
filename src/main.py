@@ -1,4 +1,4 @@
-from generator.dungeon import gen_map
+from dungeon.dungeon import gen_map
 from paint.painter import PainterConfig, create_image
 from PIL import ImageFont
 import sys

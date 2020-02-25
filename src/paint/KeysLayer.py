@@ -1,5 +1,5 @@
 from paint.painter import RenderLayer
-from generator.dungeon import Dungeon
+from dungeon.dungeon import Dungeon
 from PIL import Image, ImageDraw
 from paint.Utils import draw_dotted_line
 

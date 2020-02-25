@@ -1,6 +1,6 @@
 from PIL import ImageFont
 from paint.painter import RenderLayer
-from generator.dungeon import Dungeon
+from dungeon.dungeon import Dungeon
 from PIL import Image, ImageDraw
 
 
