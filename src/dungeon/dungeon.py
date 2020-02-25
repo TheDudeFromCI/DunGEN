@@ -1,4 +1,5 @@
 from dungeon.config import config
+from dungeon.DungeonRoom import DungeonRoom
 from random import randrange as rand
 from random import shuffle
 from math import sqrt, floor
@@ -23,55 +24,6 @@ class Dungeon:
             maxY = max(maxY, room.y)
 
         return (minX, minY, maxX, maxY)
-
-
-class DungeonRoom:
-    def __init__(self, type):
-        self.type = type
-        self.x = 0
-        self.y = 0
-        self.doors = [False, False, False, False]
-        self.lockedDoors = [False, False, False, False]
-        self.enemies = []
-        self.items = []
-        self.optional = False
-        self.pathNext = None
-        self.pathLast = None
-
-    def count_doors(self, locked=False, excluding=[]):
-        doors = self.lockedDoors if locked else self.doors
-
-        count = 0
-        for i in range(4):
-            if i not in excluding:
-                if doors[i]:
-                    count += 1
-
-        return count
-
-    def direction_to(self, room):
-        if room == None:
-            return -1
-
-        if room.x == self.x:
-            if room.y == self.y - 1:
-                return 1
-            if room.y == self.y + 1:
-                return 3
-        if room.y == self.y:
-            if room.x == self.x - 1:
-                return 0
-            if room.x == self.x + 1:
-                return 2
-
-        return -1
-
-    def locked_door_dir(self, excluding=[]):
-        for i in range(4):
-            if i not in excluding:
-                if self.lockedDoors[i]:
-                    return i
-        return -1
 
 
 def gen_map():
