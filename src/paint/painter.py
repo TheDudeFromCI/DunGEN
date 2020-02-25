@@ -159,4 +159,5 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
             images[0] = Image.alpha_composite(images[0], images[i])
 
     images[0].save(config.imageName, save_all=config.layeredImage,
-                   append_images=images[1:])
+                   append_images=images[1:], compression='tiff_lzw',
+                   tiffinfo={317: 2, 278: 1})
