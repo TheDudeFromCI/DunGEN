@@ -5,7 +5,7 @@ room can contain a set of properties detailing how the room should be
 implemented in the final product.
 """
 
-from typing import Tuple, Optional, Callable, List
+from typing import Tuple, Optional, Callable, List, Iterator, Any
 from random import shuffle, randrange as rand, random
 
 
@@ -132,8 +132,7 @@ class DungeonRoom:
     index: int
         The index of the room within the dungeon. Each room in a dungeon
         has a unquie index starting at 0 for the starting room. Index
-        values are consecutive. The index value is also used to indicate
-        the path the player is intended to take to complete the dungeon.
+        values are consecutive.
 
     doors: Tuple[bool, bool, bool, bool]
         A tuple representing the door states of each of the four walls
@@ -149,12 +148,6 @@ class DungeonRoom:
         If a dungeon uses backtracking to retrieve keys or items, side
         paths are given a depth of +1 from the depth of the room they
         branched off from. The main path always has a depth of 0.
-
-    optional: bool
-        Whether or not this room is on the required path to complete the
-        dungeon. If true, this room can be skipped entirely to reach
-        the end. If false, this room must be entered at least once to
-        complete the dungeon.
 
     type: RoomType
         The type of room this is. A room type is assigned by the config
@@ -183,7 +176,6 @@ class DungeonRoom:
         self.doors = [False, False, False, False]
         self.lockedDoors = [False, False, False, False]
         self.depth = 0
-        self.optional = False
         self.type = type
         self.difficulty = 0.0
         self.region = 0
@@ -257,6 +249,63 @@ class DungeonKey:
         self.lockedDoor: int = lockedDoor
 
 
+class DungeonPath:
+    """
+    A dungeon path is a sequence of rooms which are intended to be
+    explored in a certain order. Paths can be nested for the purpose
+    of side paths.
+
+    Attributes
+    ----------
+    rooms: List[DungeonRoom]
+        A list of rooms which make up the path.
+
+    sidePaths: List[DungeonPath]
+        A list of side paths which branch off of this path.
+
+    optional: bool
+        Whether or not this path can be skipped.
+    """
+
+    def __init__(self, optional: bool) -> None:
+        self.rooms: List[DungeonRoom] = []
+        self.sidePaths: List[DungeonPath] = []
+        self.optional = optional
+
+    def add_room(self, room: DungeonRoom) -> None:
+        """
+        Adds a new room to the end of this path.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to add.
+        """
+
+        self.rooms.append(room)
+
+    def add_sidepath(self, sidePath) -> None:  # type: ignore
+        """
+        Adds a side path to this path.
+
+        Parameters
+        ----------
+        sidePath: DungeonPath
+            The path to add.
+        """
+
+        self.sidePaths.append(sidePath)
+
+    def __iter__(self) -> Iterator[DungeonRoom]:
+        return self.rooms.__iter__()
+
+    def __reversed__(self) -> Iterator[DungeonRoom]:
+        return self.rooms.__reversed__()
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self.rooms or item in self.sidePaths
+
+
 class Dungeon:
     """
     A dungeon is a complex, maze-like structure of rooms which can be
@@ -270,11 +319,16 @@ class Dungeon:
 
     keys: List[DungeonKey]
         A list of keys in this dungeon.
+
+    mainPath: DungeonPath
+        The main path players must travel to get from the start of the
+        dungeon to the end.
     """
 
     def __init__(self) -> None:
         self.rooms: List[DungeonRoom] = []
         self.keys: List[DungeonKey] = []
+        self.mainPath: DungeonPath = DungeonPath(False)
 
     def add_room(self, room: DungeonRoom) -> None:
         """
@@ -350,6 +404,62 @@ class Dungeon:
 
         return self.rooms[-1].region + 1
 
+    def is_room_optional(self, room: DungeonRoom) -> bool:
+        """
+        Checks if a room is an optional room in this dungeon. A room is
+        considered optional if it does not lie along any required paths.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to check.
+
+        Returns
+        -------
+        True if at least one required path uses this room. False
+        otherwise.
+        """
+
+        return self.__is_room_optional_recursive(room, self.mainPath)
+
+    def __is_room_optional_recursive(self, room: DungeonRoom,
+                                     path: DungeonPath) -> bool:
+        """
+        An internal, recursive function for checking if a room is an
+        optional room or not. This function works by checking if a room
+        lies along the given path. If not, all side paths of the given
+        path are checked. If all nested paths are searched and the room
+        is not in any of them, the room is considered optional. Optional
+        nested side paths are not searched.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to check for.
+
+        path: DungeonPath
+            The path to check for the room along. This path is assumed
+            to be required.
+
+        Returns
+        -------
+        True if the room is required along the give path or one of it's
+        required side paths. False otherwise.
+        """
+
+        for r in path:
+            if r == room:
+                return False
+
+        for side in path.sidePaths:
+            if side.optional:
+                continue
+
+            if not self.__is_room_optional_recursive(room, side):
+                return False
+
+        return True
+
 
 def gen_map(config: GeneratorConfig) -> Dungeon:
     """
@@ -373,12 +483,14 @@ def gen_map(config: GeneratorConfig) -> Dungeon:
         dungeon.add_room(room)
         room.depth = 0
 
-        lastRoom = create_path(dungeon, rand(15, 30), room, config)
-        if lastRoom != None:
+        lastRoom = create_path(dungeon, rand(15, 30), room, config,
+                               dungeon.mainPath)
+        if lastRoom is not None:
             break
 
         dungeon.rooms = []
         dungeon.keys = []
+        dungeon.mainPath = DungeonPath(False)
 
     assign_regions(dungeon)
     assign_difficulties(dungeon)
@@ -413,8 +525,8 @@ def shuffle_directions(x: int, y: int) -> List[Tuple[int, int, int]]:
 
 
 def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
-                config: GeneratorConfig, depth: int = 0) \
-        -> Optional[DungeonRoom]:
+                config: GeneratorConfig, path: DungeonPath,
+                depth: int = 0) -> Optional[DungeonRoom]:
     """
     An internal function which generates a random path starting at, but
     not including, the given room. New rooms are added to the dungeon,
@@ -436,6 +548,9 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
     config: GeneratorConfig
         The config to use when generating this path.
 
+    path: DungeonPath
+        The path which is being created.
+
     depth: int
         How deep the path should be. This is used internally for
         counting depth while running recursively. This is the depth
@@ -451,6 +566,8 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
 
     #TODO Clean up rooms to avoid generating a new dungeon from scratch.
     """
+
+    path.add_room(room)
 
     prepareLocked = False
     keyLocation = None
@@ -472,6 +589,7 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
                                                      and not type.isExit))
 
         dungeon.add_room(newRoom)
+        path.add_room(newRoom)
         newRoom.depth = depth
 
         room.doors[nextPos[2]] = True
@@ -498,17 +616,22 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
 
         if length > 0:
             if rand(12) == 0:
+                sidePath = DungeonPath(True)
+                path.add_sidepath(sidePath)
+
                 branchRoom = create_path(dungeon, 1, room, config,
-                                         depth=depth + 1)
+                                         sidePath, depth=depth + 1)
 
                 if branchRoom is None:
                     return None
 
-                branchRoom.optional = True
-
             if depth == 0 and rand(4) == 0:
-                branchRoom = create_path(dungeon, rand(4) + 1, room,
-                                         config, depth=depth + 1)
+                sidePath = DungeonPath(False)
+                path.add_sidepath(sidePath)
+
+                l = rand(4) + 1
+                branchRoom = create_path(dungeon, l, room, config,
+                                         sidePath, depth=depth + 1)
 
                 if branchRoom is None:
                     return None

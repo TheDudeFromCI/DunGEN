@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageColor  # type: ignore
 from typing import Tuple, List, cast
 from math import sqrt, floor
-from DunGEN import Dungeon, DungeonRoom
+from DunGEN import Dungeon, DungeonRoom, DungeonPath
 from abc import ABCMeta, abstractmethod
 from random import randrange as rand
 
@@ -29,8 +29,6 @@ class RenderLayer(metaclass=ABCMeta):
         draw: ImageDraw
             The drawing handler to rendering to the image.
         """
-
-        pass
 
 
 class PainterConfig:
@@ -397,25 +395,17 @@ class PathLayer(RenderLayer):
                      draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
-        room = dungeon.rooms[0]
-        mainPath = [((room.pixelX + room.pixelEndX) / 2,
-                     (room.pixelY + room.pixelEndY) / 2)]
+        path = []
+        for room in dungeon.mainPath:
+            path.append(((room.pixelX + room.pixelEndX) / 2,
+                         (room.pixelY + room.pixelEndY) / 2))
 
-        while room.index < len(dungeon.rooms) - 1:
-            next = dungeon.rooms[room.index + 1]
-
-            if next.depth == 0:
-                mainPath.append(((next.pixelX + next.pixelEndX) / 2,
-                                 (next.pixelY + next.pixelEndY) / 2))
-            else:
-                next = self.draw_side_path(room, dungeon, draw)
-
-            room = next
-
-        draw.line(mainPath, fill=self.pathColor, width=3)
-
+        draw.line(path, fill=self.pathColor, width=3)
         self.draw_starting_triangle(dungeon.rooms[0], dungeon, draw)
         self.draw_ending_square(dungeon.rooms[-1], draw)
+
+        for sidePath in dungeon.mainPath.sidePaths:
+            self.draw_side_path(sidePath, draw)
 
     def draw_starting_triangle(self, room: DungeonRoom, dungeon: Dungeon,
                                draw: ImageDraw) -> None:
@@ -478,8 +468,8 @@ class PathLayer(RenderLayer):
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
         draw_hollow_rect(draw, rect, self.pathColor, thickness=4)
 
-    def draw_side_path(self, room: DungeonRoom, dungeon: Dungeon,
-                       draw: ImageDraw) -> DungeonRoom:
+    def draw_side_path(self, sidePath: DungeonPath,
+                       draw: ImageDraw) -> None:
         """
         Internal function for rendering a side path starting at a given
         room. If another side path is discovered, this function is
@@ -495,23 +485,17 @@ class PathLayer(RenderLayer):
             The drawing handler.
         """
 
-        sidePath = [((room.pixelX + room.pixelEndX) / 2,
-                     (room.pixelY + room.pixelEndY) / 2)]
+        path = []
+        for room in sidePath:
+            path.append(((room.pixelX + room.pixelEndX) / 2,
+                         (room.pixelY + room.pixelEndY) / 2))
 
-        lastRoom = room
-        branch = dungeon.rooms[room.index + 1]
-        while branch.depth > room.depth:
-            sidePath.append(((branch.pixelX + branch.pixelEndX) / 2,
-                             (branch.pixelY + branch.pixelEndY) / 2))
+        for i in range(len(path) - 1):
+            draw_dotted_line(draw, path[i],
+                             path[i + 1], 5, self.pathColor, 2)
 
-            lastRoom = branch
-            branch = dungeon.rooms[branch.index + 1]
-
-        for i in range(len(sidePath) - 1):
-            draw_dotted_line(draw, sidePath[i],
-                             sidePath[i + 1], 5, self.pathColor, 2)
-
-        return lastRoom
+        for nSidePath in sidePath.sidePaths:
+            self.draw_side_path(nSidePath, draw)
 
 
 class RoomNumbersLayer(RenderLayer):
@@ -542,7 +526,7 @@ class RoomNumbersLayer(RenderLayer):
         for room in dungeon.rooms:
             roomName = str(room.index)
 
-            if room.optional:
+            if dungeon.is_room_optional(room):
                 roomName += '*'
 
             draw.text((room.pixelX + 4, room.pixelY + 2),
