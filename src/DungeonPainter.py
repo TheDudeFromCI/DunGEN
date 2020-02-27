@@ -401,23 +401,23 @@ class PathLayer(RenderLayer):
         mainPath = [((room.pixelX + room.pixelEndX) / 2,
                      (room.pixelY + room.pixelEndY) / 2)]
 
-        while room.pathNext != None:
-            next = room.pathNext
+        while room.index < len(dungeon.rooms) - 1:
+            next = dungeon.rooms[room.index + 1]
 
             if next.depth == 0:
                 mainPath.append(((next.pixelX + next.pixelEndX) / 2,
                                  (next.pixelY + next.pixelEndY) / 2))
             else:
-                next = self.draw_side_path(room, draw)
+                next = self.draw_side_path(room, dungeon, draw)
 
             room = next
 
         draw.line(mainPath, fill=self.pathColor, width=3)
 
-        self.draw_starting_triangle(dungeon.rooms[0], draw)
+        self.draw_starting_triangle(dungeon.rooms[0], dungeon, draw)
         self.draw_ending_square(dungeon.rooms[-1], draw)
 
-    def draw_starting_triangle(self, room: DungeonRoom,
+    def draw_starting_triangle(self, room: DungeonRoom, dungeon: Dungeon,
                                draw: ImageDraw) -> None:
         """
         Internal function for rendering the starting triangle arrow.
@@ -437,7 +437,8 @@ class PathLayer(RenderLayer):
 
         points = []
 
-        d = room.direction_to(room.pathNext)
+        next = dungeon.rooms[room.index + 1]
+        d = room.direction_to(next)
         if d == 0:
             points.append((c[0] + size, c[1] - size))
             points.append((c[0] + size, c[1] + size))
@@ -477,7 +478,7 @@ class PathLayer(RenderLayer):
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
         draw_hollow_rect(draw, rect, self.pathColor, thickness=4)
 
-    def draw_side_path(self, room: DungeonRoom,
+    def draw_side_path(self, room: DungeonRoom, dungeon: Dungeon,
                        draw: ImageDraw) -> DungeonRoom:
         """
         Internal function for rendering a side path starting at a given
@@ -498,13 +499,13 @@ class PathLayer(RenderLayer):
                      (room.pixelY + room.pixelEndY) / 2)]
 
         lastRoom = room
-        branch = room.pathNext
-        while branch is not None and branch.depth > room.depth:
+        branch = dungeon.rooms[room.index + 1]
+        while branch.depth > room.depth:
             sidePath.append(((branch.pixelX + branch.pixelEndX) / 2,
                              (branch.pixelY + branch.pixelEndY) / 2))
 
             lastRoom = branch
-            branch = branch.pathNext
+            branch = dungeon.rooms[branch.index + 1]
 
         for i in range(len(sidePath) - 1):
             draw_dotted_line(draw, sidePath[i],

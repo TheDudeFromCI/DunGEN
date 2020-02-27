@@ -132,7 +132,8 @@ class DungeonRoom:
     index: int
         The index of the room within the dungeon. Each room in a dungeon
         has a unquie index starting at 0 for the starting room. Index
-        values are consecutive.
+        values are consecutive. The index value is also used to indicate
+        the path the player is intended to take to complete the dungeon.
 
     doors: Tuple[bool, bool, bool, bool]
         A tuple representing the door states of each of the four walls
@@ -143,16 +144,6 @@ class DungeonRoom:
     lockedDoors: Tuple[bool, bool, bool, bool]
         A tuple which is used to determine if a door is locked or not.
         this value works in union with the 'doors' attribute.
-
-    pathNext: Optional[DungeonRoom]
-        A pointer to the next room in the dungeon which a player should
-        move to from this room. If the player is required to backtrace,
-        the next room may not touch this room. However, it should always
-        touch a room that the player has access to.
-
-    pathLast: Optional[DungeonRoom]
-        A pointer to the last room the player was in before moving to
-        this room. This is determined by the path of the dungeon.
 
     depth: int
         If a dungeon uses backtracking to retrieve keys or items, side
@@ -191,8 +182,6 @@ class DungeonRoom:
         self.index = 0
         self.doors = [False, False, False, False]
         self.lockedDoors = [False, False, False, False]
-        self.pathNext: Optional[DungeonRoom] = None
-        self.pathLast: Optional[DungeonRoom] = None
         self.depth = 0
         self.optional = False
         self.type = type
@@ -500,10 +489,6 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
 
                 keyLocation.pathNext = newRoom
                 newRoom.pathLast = room
-        else:
-            if room is not None:
-                room.pathNext = newRoom
-                newRoom.pathLast = room
 
         newRoom.x = nextPos[0]
         newRoom.y = nextPos[1]
@@ -544,23 +529,14 @@ def assign_regions(dungeon: Dungeon) -> None:
         The dungeon to process.
     """
 
-    room = dungeon.rooms[0]
     region = 0
-    while room is not None:
-        room.region = region
-
-        next = room.pathNext
-        if next is not None and next.depth < room.depth:
-            region += 1
-
-        if next is None:
-            break
-
-        room = next
-
+    depth = 0
     for room in dungeon.rooms:
-        if room.optional and room.pathLast is not None:
-            room.region = room.pathLast.region
+        if room.depth < depth:
+            region += 1
+            depth = room.depth
+
+        room.region = region
 
 
 def assign_difficulties(dungeon: Dungeon) -> None:
