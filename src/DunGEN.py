@@ -7,6 +7,7 @@ implemented in the final product.
 
 from typing import Tuple, Optional, Callable, List, Iterator, Any
 from random import shuffle, randrange as rand, random
+from abc import ABCMeta, abstractmethod
 
 
 class GeneratorError(Exception):
@@ -63,10 +64,15 @@ class GeneratorConfig:
     ----------
     roomTypes: List[RoomType]
         A list of room types which can exist within the dungeon.
+
+    layers: List[DungeonGENLayer]
+        A list of generation layers which should be used to generate
+        the dungeon.
     """
 
     def __init__(self) -> None:
         self.roomTypes: List[RoomType] = []
+        self.layers: List[DungeonGENLayer] = []
 
     def add_room_type(self, roomType: RoomType) -> None:
         """
@@ -111,6 +117,18 @@ class GeneratorConfig:
             return remaining[0]
 
         raise GeneratorError
+
+    def add_layer(self, layer) -> None:  # type: ignore
+        """
+        Adds a new dungeon processing layer to this config.
+
+        Parameters
+        ----------
+        layer: DungeonGENLayer
+            The layer to add.
+        """
+
+        self.layers.append(layer)
 
 
 class DungeonRoom:
@@ -461,6 +479,33 @@ class Dungeon:
         return True
 
 
+class DungeonGENLayer(metaclass=ABCMeta):
+    """
+    A DungenGENLayer is a processing step which is used when generating
+    a dungeon to handle what information should be added to the dungeon
+    and how it should be layed out. During generation, a series of
+    layers are added to the config, which are executed in the order they
+    were added.
+    """
+
+    @abstractmethod
+    def process_dungeon(self, dungeon: Dungeon,
+                        config: GeneratorConfig) -> None:
+        """
+        This method is called by the dungeon generator in the sequence
+        which the generation layers are defined by the config. This call
+        is used to preform the processing.
+
+        Parameters
+        ----------
+        dungeon: Dungeon
+            The dungeon to process.
+
+        config: GeneratorConfig
+            The config to use when processing the dungeon.
+        """
+
+
 def gen_map(config: GeneratorConfig) -> Dungeon:
     """
     Creates a new, randomized dungeon as specified by the config object.
@@ -477,227 +522,249 @@ def gen_map(config: GeneratorConfig) -> Dungeon:
 
     dungeon = Dungeon()
 
-    while True:
-        room = DungeonRoom(config.random_room(lambda type:
-                                              type.isEntrance))
-        dungeon.add_room(room)
-        room.depth = 0
-
-        lastRoom = create_path(dungeon, rand(15, 30), room, config,
-                               dungeon.mainPath)
-        if lastRoom is not None:
-            break
-
-        dungeon.rooms = []
-        dungeon.keys = []
-        dungeon.mainPath = DungeonPath(False)
-
-    assign_regions(dungeon)
-    assign_difficulties(dungeon)
+    for layer in config.layers:
+        layer.process_dungeon(dungeon, config)
 
     return dungeon
 
 
-def shuffle_directions(x: int, y: int) -> List[Tuple[int, int, int]]:
+class BranchingPathLayer(DungeonGENLayer):
     """
-    Creates a list of room positions which touch the given room
-    coordates. The list is returned in a randomized order.
-
-    Parameters
-    ----------
-    x: int
-        The x position of the room.
-
-    y: int
-        The y position of the room.
-
-    Returns
-    -------
-    The list of new possible room positions in random order. The first
-    two values of the room position tuple refer to the x and y
-    coordinates, while the third value is the direction to that room
-    from the given room coords.
+    The branching path layer is used to create a series of rooms which
+    fill the dungeon through the process of creating a path which relies
+    on a series of side paths to continue along the main path.
     """
 
-    directions = [(x - 1, y, 0), (x, y - 1, 1), (x + 1, y, 2), (x, y + 1, 3)]
-    shuffle(directions)
-    return directions
+    def __init__(self) -> None:
+        pass
+
+    def process_dungeon(self, dungeon: Dungeon,
+                        config: GeneratorConfig) -> None:
+        """See DungenGENLayer for docs."""
+
+        while True:
+            room = DungeonRoom(config.random_room(lambda type:
+                                                  type.isEntrance))
+            dungeon.add_room(room)
+            room.depth = 0
+
+            lastRoom = self.create_path(dungeon, rand(15, 30), room, config,
+                                        dungeon.mainPath)
+            if lastRoom is not None:
+                break
+
+            dungeon.rooms = []
+            dungeon.keys = []
+            dungeon.mainPath = DungeonPath(False)
+
+    def shuffle_directions(self, x: int, y: int) -> List[Tuple[int, int, int]]:
+        """
+        Creates a list of room positions which touch the given room
+        coordates. The list is returned in a randomized order.
+
+        Parameters
+        ----------
+        x: int
+            The x position of the room.
+
+        y: int
+            The y position of the room.
+
+        Returns
+        -------
+        The list of new possible room positions in random order. The first
+        two values of the room position tuple refer to the x and y
+        coordinates, while the third value is the direction to that room
+        from the given room coords.
+        """
+
+        directions = [(x - 1, y, 0), (x, y - 1, 1),
+                      (x + 1, y, 2), (x, y + 1, 3)]
+        shuffle(directions)
+        return directions
+
+    def create_path(self, dungeon: Dungeon, length: int,
+                    room: DungeonRoom, config: GeneratorConfig,
+                    path: DungeonPath,
+                    depth: int = 0) -> Optional[DungeonRoom]:
+        """
+        An internal function which generates a random path starting at, but
+        not including, the given room. New rooms are added to the dungeon,
+        and cannot be placed over existing rooms. This function may call
+        itself recursively to add additional branching paths.
+
+        Parameters
+        ----------
+        dungeon: Dungeon
+            The dungeon to add the rooms to.
+
+        length: int
+            The length of the path to generate.
+
+        room: DungeonRoom
+            The starting room. This is not part of the path, but determines
+            where the path should start from.
+
+        config: GeneratorConfig
+            The config to use when generating this path.
+
+        path: DungeonPath
+            The path which is being created.
+
+        depth: int
+            How deep the path should be. This is used internally for
+            counting depth while running recursively. This is the depth
+            value assigned to all rooms which are generated by this path.
+            Nested paths use a depth of +1 for each recursive layer.
+
+        Returns
+        -------
+        The last room which was generated by this path. If the path could
+        not be successfully generated, the last room will return None. If
+        the path fails to generate, this function does not currently clean
+        up the rooms which it generated.
+
+        # TODO Clean up rooms to avoid generating a new dungeon from scratch.
+        """
+
+        path.add_room(room)
+
+        prepareLocked = False
+        keyLocation = None
+        while length > 0:
+            nextPos = None
+            for direction in self.shuffle_directions(room.x, room.y):
+                if dungeon.get_room_at(direction[0], direction[1]) == None:
+                    nextPos = direction
+
+            if nextPos is None:
+                return None
+
+            if depth == 0 and length == 1:
+                newRoom = DungeonRoom(config.random_room(lambda type:
+                                                         type.isExit))
+            else:
+                newRoom = DungeonRoom(config.random_room(lambda type:
+                                                         not type.isEntrance
+                                                         and not type.isExit))
+
+            dungeon.add_room(newRoom)
+            path.add_room(newRoom)
+            newRoom.depth = depth
+
+            room.doors[nextPos[2]] = True
+            newRoom.doors[(nextPos[2] + 2) % 4] = True
+
+            if prepareLocked:
+                prepareLocked = False
+
+                room.lockedDoors[nextPos[2]] = True
+                newRoom.lockedDoors[(nextPos[2] + 2) % 4] = True
+
+                if keyLocation is not None:
+                    dungeon.keys.append(DungeonKey(
+                        keyLocation, room, nextPos[2]))
+
+                    keyLocation.pathNext = newRoom
+                    newRoom.pathLast = room
+
+            newRoom.x = nextPos[0]
+            newRoom.y = nextPos[1]
+            room = newRoom
+
+            length -= 1
+
+            if length > 0:
+                if rand(12) == 0:
+                    sidePath = DungeonPath(True)
+                    path.add_sidepath(sidePath)
+
+                    branchRoom = self.create_path(dungeon, 1, room, config,
+                                                  sidePath, depth=depth + 1)
+
+                    if branchRoom is None:
+                        return None
+
+                if depth == 0 and rand(4) == 0:
+                    sidePath = DungeonPath(False)
+                    path.add_sidepath(sidePath)
+
+                    l = rand(4) + 1
+                    branchRoom = self.create_path(dungeon, l, room, config,
+                                                  sidePath, depth=depth + 1)
+
+                    if branchRoom is None:
+                        return None
+
+                    prepareLocked = True
+                    keyLocation = branchRoom
+
+        return room
 
 
-def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
-                config: GeneratorConfig, path: DungeonPath,
-                depth: int = 0) -> Optional[DungeonRoom]:
+class AssignRegionsLayer(DungeonGENLayer):
     """
-    An internal function which generates a random path starting at, but
-    not including, the given room. New rooms are added to the dungeon,
-    and cannot be placed over existing rooms. This function may call
-    itself recursively to add additional branching paths.
-
-    Parameters
-    ----------
-    dungeon: Dungeon
-        The dungeon to add the rooms to.
-
-    length: int
-        The length of the path to generate.
-
-    room: DungeonRoom
-        The starting room. This is not part of the path, but determines
-        where the path should start from.
-
-    config: GeneratorConfig
-        The config to use when generating this path.
-
-    path: DungeonPath
-        The path which is being created.
-
-    depth: int
-        How deep the path should be. This is used internally for
-        counting depth while running recursively. This is the depth
-        value assigned to all rooms which are generated by this path.
-        Nested paths use a depth of +1 for each recursive layer.
-
-    Returns
-    -------
-    The last room which was generated by this path. If the path could
-    not be successfully generated, the last room will return None. If
-    the path fails to generate, this function does not currently clean
-    up the rooms which it generated.
-
-    #TODO Clean up rooms to avoid generating a new dungeon from scratch.
+    The assign regions layer can be used to break down a dungeon into a
+    series of regions based on where locked doors are located. A room's
+    region number is the total number of locked doors a player must pass
+    through to reach the room from the start.
     """
 
-    path.add_room(room)
+    def __init__(self) -> None:
+        pass
 
-    prepareLocked = False
-    keyLocation = None
-    while length > 0:
-        nextPos = None
-        for direction in shuffle_directions(room.x, room.y):
-            if dungeon.get_room_at(direction[0], direction[1]) == None:
-                nextPos = direction
+    def process_dungeon(self, dungeon: Dungeon,
+                        config: GeneratorConfig) -> None:
+        """See DungenGENLayer for docs."""
 
-        if nextPos is None:
-            return None
+        region = 0
+        depth = 0
+        for room in dungeon.rooms:
+            if room.depth < depth:
+                region += 1
+                depth = room.depth
 
-        if depth == 0 and length == 1:
-            newRoom = DungeonRoom(config.random_room(lambda type:
-                                                     type.isExit))
-        else:
-            newRoom = DungeonRoom(config.random_room(lambda type:
-                                                     not type.isEntrance
-                                                     and not type.isExit))
-
-        dungeon.add_room(newRoom)
-        path.add_room(newRoom)
-        newRoom.depth = depth
-
-        room.doors[nextPos[2]] = True
-        newRoom.doors[(nextPos[2] + 2) % 4] = True
-
-        if prepareLocked:
-            prepareLocked = False
-
-            room.lockedDoors[nextPos[2]] = True
-            newRoom.lockedDoors[(nextPos[2] + 2) % 4] = True
-
-            if keyLocation is not None:
-                dungeon.keys.append(DungeonKey(
-                    keyLocation, room, nextPos[2]))
-
-                keyLocation.pathNext = newRoom
-                newRoom.pathLast = room
-
-        newRoom.x = nextPos[0]
-        newRoom.y = nextPos[1]
-        room = newRoom
-
-        length -= 1
-
-        if length > 0:
-            if rand(12) == 0:
-                sidePath = DungeonPath(True)
-                path.add_sidepath(sidePath)
-
-                branchRoom = create_path(dungeon, 1, room, config,
-                                         sidePath, depth=depth + 1)
-
-                if branchRoom is None:
-                    return None
-
-            if depth == 0 and rand(4) == 0:
-                sidePath = DungeonPath(False)
-                path.add_sidepath(sidePath)
-
-                l = rand(4) + 1
-                branchRoom = create_path(dungeon, l, room, config,
-                                         sidePath, depth=depth + 1)
-
-                if branchRoom is None:
-                    return None
-
-                prepareLocked = True
-                keyLocation = branchRoom
-
-    return room
+            room.region = region
 
 
-def assign_regions(dungeon: Dungeon) -> None:
+class AssignDifficultiesLayer(DungeonGENLayer):
     """
-    Assigns the region values to each room in the dungeon.
-
-    Parameters
-    ----------
-    dungeon: Dungeon
-        The dungeon to process.
+    This layer is used to generate the difficulty values for each room
+    in the dungeon. This can be used to ensure a steady difficulty
+    progression is made throughout the dungeon.
     """
 
-    region = 0
-    depth = 0
-    for room in dungeon.rooms:
-        if room.depth < depth:
-            region += 1
-            depth = room.depth
+    def __init__(self) -> None:
+        pass
 
-        room.region = region
+    def process_dungeon(self, dungeon: Dungeon,
+                        config: GeneratorConfig) -> None:
+        """See DungenGENLayer for docs."""
 
+        diff = 0
+        currentRegion = 0
+        regionValues = [0] * (dungeon.region_count() + 1)
+        for room in dungeon.rooms:
+            if room.region != currentRegion:
+                currentRegion = room.region
+                regionValues[currentRegion] = diff
 
-def assign_difficulties(dungeon: Dungeon) -> None:
-    """
-    This function is called after a dungeon path is generated to assign
-    the difficult values for each room within the dungeon, based on
-    their position along the path.
+            room.difficulty = diff
+            diff += 1
 
-    Parameters
-    ----------
-    dungeon: Dungeon
-        The dungeon to process.
-    """
+        diff -= 1
+        regionValues[-1] = diff
+        c = 2 / 3
 
-    diff = 0
-    currentRegion = 0
-    regionValues = [0] * (dungeon.region_count() + 1)
-    for room in dungeon.rooms:
-        if room.region != currentRegion:
-            currentRegion = room.region
-            regionValues[currentRegion] = diff
+        for room in dungeon.rooms:
+            x1 = regionValues[room.region]
+            x2 = regionValues[room.region + 1]
+            n = room.difficulty
 
-        room.difficulty = diff
-        diff += 1
+            d = (((n - x1) / (x2 - x1)) ** 2) * (x2 - c * x1) + c * x1
+            d /= diff
 
-    diff -= 1
-    regionValues[-1] = diff
-    c = 2 / 3
+            d += random() * 0.05 - 0.025
+            d = max(0, min(1, d))
 
-    for room in dungeon.rooms:
-        x1 = regionValues[room.region]
-        x2 = regionValues[room.region + 1]
-        n = room.difficulty
-
-        d = (((n - x1) / (x2 - x1)) ** 2) * (x2 - c * x1) + c * x1
-        d /= diff
-
-        d += random() * 0.05 - 0.025
-        d = max(0, min(1, d))
-
-        room.difficulty = d
+            room.difficulty = d

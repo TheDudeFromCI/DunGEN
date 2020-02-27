@@ -57,6 +57,10 @@ def get_dungeon_config() -> GeneratorConfig:
     roomType.name = 'Mini Boss'
     dungeonConfig.add_room_type(roomType)
 
+    dungeonConfig.add_layer(DunGEN.BranchingPathLayer())
+    dungeonConfig.add_layer(DunGEN.AssignRegionsLayer())
+    dungeonConfig.add_layer(DunGEN.AssignDifficultiesLayer())
+
     return dungeonConfig
 
 
