@@ -44,7 +44,7 @@ class RoomType:
         Whether or not this room is allowed to be used as an exit room.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = 'Unnamed Room'
         self.optional = False
         self.maxDoors = 4
@@ -65,8 +65,8 @@ class GeneratorConfig:
         A list of room types which can exist within the dungeon.
     """
 
-    def __init__(self):
-        self.roomTypes = []
+    def __init__(self) -> None:
+        self.roomTypes: List[RoomType] = []
 
     def add_room_type(self, roomType: RoomType) -> None:
         """
@@ -144,11 +144,15 @@ class DungeonRoom:
         A tuple which is used to determine if a door is locked or not.
         this value works in union with the 'doors' attribute.
 
-    pathNext: DungeonRoom
+    pathNext: Optional[DungeonRoom]
         A pointer to the next room in the dungeon which a player should
         move to from this room. If the player is required to backtrace,
         the next room may not touch this room. However, it should always
         touch a room that the player has access to.
+
+    pathLast: Optional[DungeonRoom]
+        A pointer to the last room the player was in before moving to
+        this room. This is determined by the path of the dungeon.
 
     depth: int
         If a dungeon uses backtracking to retrieve keys or items, side
@@ -187,7 +191,8 @@ class DungeonRoom:
         self.index = 0
         self.doors = [False, False, False, False]
         self.lockedDoors = [False, False, False, False]
-        self.pathNext = None
+        self.pathNext: Optional[DungeonRoom] = None
+        self.pathLast: Optional[DungeonRoom] = None
         self.depth = 0
         self.optional = False
         self.type = type
@@ -223,6 +228,46 @@ class DungeonRoom:
         return -1
 
 
+class DungeonKey:
+    """
+    A dungeon key is a pointer for referencing a locked door-key
+    location pair. This is used for determining how a player may advance
+    through a dungeon.
+
+    Attributes
+    ----------
+    keyLocation: DungeonRoom
+        The room where the key is located.
+
+    lockLocation: DungeonRoom
+        The room containing the locked door.
+
+    lockedDoor: int
+        A direction value indicating which door within the room is
+        locked.
+    """
+
+    def __init__(self, keyLocation: DungeonRoom,
+                 lockLocation: DungeonRoom, lockedDoor: int) -> None:
+        """
+        Parameters
+        ----------
+        keyLocation: DungeonRoom
+            The room where the key is located.
+
+        lockLocation: DungeonRoom
+            The room containing the locked door.
+
+        lockedDoor: int
+            A direction value indicating which door within the room is
+            locked.
+        """
+
+        self.keyLocation: DungeonRoom = keyLocation
+        self.lockLocation: DungeonRoom = lockLocation
+        self.lockedDoor: int = lockedDoor
+
+
 class Dungeon:
     """
     A dungeon is a complex, maze-like structure of rooms which can be
@@ -234,13 +279,13 @@ class Dungeon:
         A list of rooms in this dungeon. The index of the room within
         this list is equal to the room's index attribute.
 
-    keys
+    keys: List[DungeonKey]
         A list of keys in this dungeon.
     """
 
-    def __init__(self):
-        self.rooms = []
-        self.keys = []
+    def __init__(self) -> None:
+        self.rooms: List[DungeonRoom] = []
+        self.keys: List[DungeonKey] = []
 
     def add_room(self, room: DungeonRoom) -> None:
         """
@@ -267,8 +312,8 @@ class Dungeon:
         list, respectively.
         """
 
-        minX = minY = float("inf")
-        maxX = maxY = float("-inf")
+        minX = minY = 10000000
+        maxX = maxY = -10000000
 
         for room in self.rooms:
             minX = min(minX, room.x)
@@ -299,6 +344,8 @@ class Dungeon:
         for room in self.rooms:
             if room.x == x and room.y == y:
                 return room
+
+        return None
 
     def region_count(self) -> int:
         """
@@ -447,16 +494,16 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
             room.lockedDoors[nextPos[2]] = True
             newRoom.lockedDoors[(nextPos[2] + 2) % 4] = True
 
-            dungeon.keys.append(
-                {'Key Location': keyLocation,
-                 'Locked Room': room,
-                 'Locked Door': nextPos[2]})
+            if keyLocation is not None:
+                dungeon.keys.append(DungeonKey(
+                    keyLocation, room, nextPos[2]))
 
-            keyLocation.pathNext = newRoom
-            newRoom.pathLast = room
+                keyLocation.pathNext = newRoom
+                newRoom.pathLast = room
         else:
-            room.pathNext = newRoom
-            newRoom.pathLast = room
+            if room is not None:
+                room.pathNext = newRoom
+                newRoom.pathLast = room
 
         newRoom.x = nextPos[0]
         newRoom.y = nextPos[1]
@@ -469,7 +516,7 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
                 branchRoom = create_path(dungeon, 1, room, config,
                                          depth=depth + 1)
 
-                if branchRoom == None:
+                if branchRoom is None:
                     return None
 
                 branchRoom.optional = True
@@ -478,7 +525,7 @@ def create_path(dungeon: Dungeon, length: int, room: DungeonRoom,
                 branchRoom = create_path(dungeon, rand(4) + 1, room,
                                          config, depth=depth + 1)
 
-                if branchRoom == None:
+                if branchRoom is None:
                     return None
 
                 prepareLocked = True
@@ -499,14 +546,21 @@ def assign_regions(dungeon: Dungeon) -> None:
 
     room = dungeon.rooms[0]
     region = 0
-    while room != None:
+    while room is not None:
         room.region = region
 
         next = room.pathNext
-        if next != None and next.depth < room.depth:
+        if next is not None and next.depth < room.depth:
             region += 1
 
+        if next is None:
+            break
+
         room = next
+
+    for room in dungeon.rooms:
+        if room.optional and room.pathLast is not None:
+            room.region = room.pathLast.region
 
 
 def assign_difficulties(dungeon: Dungeon) -> None:
@@ -544,7 +598,7 @@ def assign_difficulties(dungeon: Dungeon) -> None:
         d = (((n - x1) / (x2 - x1)) ** 2) * (x2 - c * x1) + c * x1
         d /= diff
 
-        d += random() * 0.03 - 0.015
+        d += random() * 0.05 - 0.025
         d = max(0, min(1, d))
 
         room.difficulty = d

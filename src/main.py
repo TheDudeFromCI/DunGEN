@@ -1,4 +1,4 @@
-from PIL import ImageFont
+from PIL import ImageFont  # type: ignore
 import sys
 import os
 import subprocess
@@ -28,7 +28,7 @@ def open_image(filename: str) -> None:
     subprocess.run([open_cmd, filename], check=True)
 
 
-def get_dungeon_config():
+def get_dungeon_config() -> GeneratorConfig:
     dungeonConfig = GeneratorConfig()
 
     roomType = RoomType()
@@ -60,7 +60,7 @@ def get_dungeon_config():
     return dungeonConfig
 
 
-def get_painter_config():
+def get_painter_config() -> PainterConfig:
     painterConfig = PainterConfig()
     painterConfig.layeredImage = False
 

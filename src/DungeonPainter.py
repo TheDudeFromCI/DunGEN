@@ -1,5 +1,5 @@
-from PIL import Image, ImageDraw, ImageFont, ImageColor
-from typing import Tuple
+from PIL import Image, ImageDraw, ImageFont, ImageColor  # type: ignore
+from typing import Tuple, List, cast
 from math import sqrt, floor
 from DunGEN import Dungeon, DungeonRoom
 from abc import ABCMeta, abstractmethod
@@ -66,12 +66,12 @@ class PainterConfig:
         extension to use layers.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.layeredImage = True
         self.roomSize = 128
         self.headerSize = 64
         self.imageName = 'Dungeon.tiff'
-        self.layers = []
+        self.layers: List[RenderLayer] = []
 
     def add_render_layer(self, layer: RenderLayer) -> None:
         """
@@ -117,7 +117,8 @@ def plot_map(dungeon: Dungeon, config: PainterConfig) -> Tuple[int, int]:
     for roomIndex, room in enumerate(dungeon.rooms):
         room.index = roomIndex
         room.pixelX = (room.x - bounds[0] + 1) * roomSize
-        room.pixelY = (room.y - bounds[1] + 1) * roomSize + headerSize
+        room.pixelY = (room.y - bounds[1] + 1) * \
+            roomSize + headerSize
 
         room.pixelEndX = room.pixelX + roomSize - 1
         room.pixelEndY = room.pixelY + roomSize - 1
@@ -166,9 +167,9 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
                    tiffinfo={317: 2, 278: 1})
 
 
-def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
-                     end: Tuple[int, int], length: int, color,
-                     width: int):
+def draw_dotted_line(draw: ImageDraw, start: Tuple[float, float],
+                     end: Tuple[float, float], length: int,
+                     color: Tuple[int, int, int], width: int) -> None:
     """
     Draws a dotted line between two points.
 
@@ -187,7 +188,7 @@ def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
         The length, in pixels, of each dashed line segment along the
         line. This is also used as the number of pixels between dashes.
 
-    color
+    color: Tuple[int, int, int]
         The color to render the line segments with.
 
     width: int
@@ -209,7 +210,8 @@ def draw_dotted_line(draw: ImageDraw, start: Tuple[int, int],
 
 
 def draw_hollow_rect(draw: ImageDraw, rect: Tuple[int, int, int, int],
-                     color, thickness: int = 2) -> None:
+                     color: Tuple[int, int, int],
+                     thickness: int = 2) -> None:
     """
     Fills a rectanglular area with a given color, but erases the inside,
     leaving an outline with a completely transparent inside.
@@ -242,11 +244,11 @@ class FillLayer(RenderLayer):
     Often used for setting the background color.
     """
 
-    def __init__(self, color):
+    def __init__(self, color: Tuple[int, int, int]) -> None:
         """
         Parameters
         ----------
-        color
+        color: Tuple[int, int, int]
             The color to fill the image with.
         """
 
@@ -266,11 +268,12 @@ class KeysLayer(RenderLayer):
     corresponding keys are located.
     """
 
-    def __init__(self, keyColor, keyRadius: int):
+    def __init__(self, keyColor: Tuple[int, int, int],
+                 keyRadius: int) -> None:
         """
         Parameters
         ----------
-        keyColor
+        keyColor: Tuple[int, int, int]
             The color to use when rendering key locations.
 
         keyRadius: int
@@ -285,7 +288,7 @@ class KeysLayer(RenderLayer):
         """See RenderLayer for docs."""
 
         for key in dungeon.keys:
-            keyRoom = key['Key Location']
+            keyRoom = key.keyLocation
 
             keyX = (keyRoom.pixelX + keyRoom.pixelEndX) / 2
             keyY = (keyRoom.pixelY + keyRoom.pixelEndY) / 2
@@ -301,17 +304,18 @@ class WallsLayer(RenderLayer):
     the base shape of the dungeon.
     """
 
-    def __init__(self, doorSize: int, wallColor, lockColor):
+    def __init__(self, doorSize: int, wallColor: Tuple[int, int, int],
+                 lockColor: Tuple[int, int, int]) -> None:
         """
         Parameters
         ----------
         doorSize: int
             The number of pixels to use when rendering a door opening.
 
-        wallColor
+        wallColor: Tuple[int, int, int]
             The color to use when rendering walls.
 
-        lockColor
+        lockColor: Tuple[int, int, int]
             The color to use when rendering locked doors.
         """
 
@@ -379,11 +383,11 @@ class PathLayer(RenderLayer):
     represent side paths. (Used to obtain required materials)
     """
 
-    def __init__(self, pathColor):
+    def __init__(self, pathColor: Tuple[int, int, int]) -> None:
         """
         Parameters
         ----------
-        pathColor
+        pathColor: Tuple[int, int, int]
             The color of the path to draw.
         """
 
@@ -473,7 +477,8 @@ class PathLayer(RenderLayer):
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
         draw_hollow_rect(draw, rect, self.pathColor, thickness=4)
 
-    def draw_side_path(self, room: DungeonRoom, draw: ImageDraw) -> None:
+    def draw_side_path(self, room: DungeonRoom,
+                       draw: ImageDraw) -> DungeonRoom:
         """
         Internal function for rendering a side path starting at a given
         room. If another side path is discovered, this function is
@@ -494,7 +499,7 @@ class PathLayer(RenderLayer):
 
         lastRoom = room
         branch = room.pathNext
-        while branch != None and branch.depth > room.depth:
+        while branch is not None and branch.depth > room.depth:
             sidePath.append(((branch.pixelX + branch.pixelEndX) / 2,
                              (branch.pixelY + branch.pixelEndY) / 2))
 
@@ -514,7 +519,8 @@ class RoomNumbersLayer(RenderLayer):
     corner of the room.
     """
 
-    def __init__(self, font: ImageFont, textColor):
+    def __init__(self, font: ImageFont,
+                 textColor: Tuple[int, int, int]) -> None:
         """
         Parameters
         ----------
@@ -553,7 +559,7 @@ class RegionLayer(RenderLayer):
                      draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
-        regionColors = [0] * dungeon.region_count()
+        regionColors = [(0, 0, 0)] * dungeon.region_count()
         for i in range(len(regionColors)):
             r = rand(128) + 128
             g = rand(128) + 128
@@ -592,7 +598,7 @@ class DifficultyLayer(RenderLayer):
         """
 
         col = 'hsl(' + str((1 - value) * 240) + ', 100%, 50%)'
-        return ImageColor.getrgb(col)
+        return cast(Tuple[int, int, int], ImageColor.getrgb(col))
 
     def render_layer(self, dungeon: Dungeon, img: Image,
                      draw: ImageDraw) -> None:
