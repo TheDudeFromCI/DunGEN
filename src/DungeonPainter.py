@@ -27,6 +27,9 @@ class PaintableRoom:
 
     rect: Tuple[int, int, int, int]
         A rectangle containing the start and end points.
+
+    size: int
+        The room size in pixels.
     """
 
     def __init__(self, room: DungeonRoom):
@@ -42,6 +45,7 @@ class PaintableRoom:
         self.end = (0, 0)
         self.center = (0, 0)
         self.rect = (0, 0, 0, 0)
+        self.size = 0
 
 
 class RenderLayer(metaclass=ABCMeta):
@@ -175,6 +179,8 @@ def plot_map(dungeon: Dungeon,
 
         p.rect = (p.start[0], p.start[1],
                   p.end[0], p.end[1])
+
+        p.size = roomSize
 
         paintableRooms[room] = p
 
@@ -413,9 +419,9 @@ class WallsLayer(RenderLayer):
                       s[0] + doorEnd, e[1])
                 draw.rectangle(r4, fill=(0, 0, 0, 0))
 
-        for room in dungeon.rooms:
-            if not (room.lockedDoors[0] or room.lockedDoors[1]):
-                continue
+        for key in dungeon.keys:
+            room = key.lockLocation
+            door = key.lockedDoor
 
             paint = paintableRooms[room]
             doorStart = int(
@@ -423,12 +429,21 @@ class WallsLayer(RenderLayer):
             doorEnd = doorStart + self.doorSize
 
             s = paint.start
-            if room.lockedDoors[0]:
+
+            if door == 2:
+                s = (s[0] + paint.size, s[1])
+                door = 0
+
+            if door == 3:
+                s = (s[0], s[1] + paint.size)
+                door = 1
+
+            if door == 0:
                 r1 = (s[0] - 4 - 2, s[1] + doorStart,
                       s[0] + 4, s[1] + doorEnd)
                 draw_hollow_rect(draw, r1, self.lockColor)
 
-            if room.lockedDoors[1]:
+            if door == 1:
                 r2 = (s[0] + doorStart, s[1] - 4 - 2,
                       s[0] + doorEnd, s[1] + 4)
                 draw_hollow_rect(draw, r2, self.lockColor)

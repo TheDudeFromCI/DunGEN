@@ -158,10 +158,6 @@ class DungeonRoom:
         north door, 2 is east, and 3 is south. A value of true means
         this wall contains a doorway.
 
-    lockedDoors: Tuple[bool, bool, bool, bool]
-        A tuple which is used to determine if a door is locked or not.
-        this value works in union with the 'doors' attribute.
-
     depth: int
         If a dungeon uses backtracking to retrieve keys or items, side
         paths are given a depth of +1 from the depth of the room they
@@ -191,8 +187,7 @@ class DungeonRoom:
         self.x = 0
         self.y = 0
         self.index = 0
-        self.doors = [False, False, False, False]
-        self.lockedDoors = [False, False, False, False]
+        self.doors = (False, False, False, False)
         self.depth = 0
         self.type: Optional[RoomType] = None
         self.difficulty = 0.0
@@ -225,6 +220,33 @@ class DungeonRoom:
                 return 2
 
         return -1
+
+    def set_door(self, door: int, state: bool) -> None:
+        """
+        Sets whether the given door should be open or closed.
+
+        Parameters
+        ----------
+        door: int
+            The direction to the door. 0-3, inclusive.
+
+        state: bool
+            True if the door should be open. False otherwise.
+        """
+
+        d = self.doors
+
+        if door == 0:
+            self.doors = (state, d[1], d[2], d[3])
+
+        if door == 1:
+            self.doors = (d[0], state, d[2], d[3])
+
+        if door == 2:
+            self.doors = (d[0], d[1], state, d[3])
+
+        if door == 3:
+            self.doors = (d[0], d[1], d[2], state)
 
 
 class DungeonKey:
@@ -638,14 +660,11 @@ class BranchingPathLayer(DungeonGENLayer):
             path.add_room(newRoom)
             newRoom.depth = depth
 
-            room.doors[nextPos[2]] = True
-            newRoom.doors[(nextPos[2] + 2) % 4] = True
+            room.set_door(nextPos[2], True)
+            newRoom.set_door((nextPos[2] + 2) % 4, True)
 
             if prepareLocked:
                 prepareLocked = False
-
-                room.lockedDoors[nextPos[2]] = True
-                newRoom.lockedDoors[(nextPos[2] + 2) % 4] = True
 
                 if keyLocation is not None:
                     dungeon.keys.append(DungeonKey(
