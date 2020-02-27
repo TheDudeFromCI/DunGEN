@@ -1,9 +1,47 @@
 from PIL import Image, ImageDraw, ImageFont, ImageColor  # type: ignore
-from typing import Tuple, List, cast
+from typing import Tuple, List, cast, Dict
 from math import sqrt, floor
 from DunGEN import Dungeon, DungeonRoom, DungeonPath
 from abc import ABCMeta, abstractmethod
 from random import randrange as rand
+
+
+class PaintableRoom:
+    """
+    A paintable room is a wrapper for a dungeon room which also
+    contains the pixel position of the room.
+
+    Attributes
+    ----------
+    room: DungeonRoom
+        The room this wrapper represents.
+
+    start: Tuple[int, int]
+        The top left pixel coordinates.
+
+    end: Tuple[int, int]
+        The bottom right pixel coordinates.
+
+    center: Tuple[float, float]
+        The center pixel coordinates.
+
+    rect: Tuple[int, int, int, int]
+        A rectangle containing the start and end points.
+    """
+
+    def __init__(self, room: DungeonRoom):
+        """
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room this wrapper represents.
+        """
+
+        self.room = room
+        self.start = (0, 0)
+        self.end = (0, 0)
+        self.center = (0, 0)
+        self.rect = (0, 0, 0, 0)
 
 
 class RenderLayer(metaclass=ABCMeta):
@@ -12,8 +50,9 @@ class RenderLayer(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """
         Renders a single image layer of a dungeon.
 
@@ -21,6 +60,10 @@ class RenderLayer(metaclass=ABCMeta):
         ----------
         dungeon: Dungeon
             The dungeon which is being rendered.
+
+        paintableRooms: Dict[DungeonRoom, PaintableRoom]
+            A dictionary of wrappers which can be used to extract the
+            pixel coordinates of each room.
 
         img: Image
             The virtual image being written to. A new, empty image is
@@ -85,7 +128,9 @@ class PainterConfig:
         self.layers.append(layer)
 
 
-def plot_map(dungeon: Dungeon, config: PainterConfig) -> Tuple[int, int]:
+def plot_map(dungeon: Dungeon,
+             paintableRooms: Dict[DungeonRoom, PaintableRoom],
+             config: PainterConfig) -> Tuple[int, int]:
     """
     Plots the pixel position of each room on the final image, and
     generates the image size required to fully render the dungeon.
@@ -95,6 +140,10 @@ def plot_map(dungeon: Dungeon, config: PainterConfig) -> Tuple[int, int]:
     ----------
     dungeon: Dungeon
         The dungeon which is being plotted.
+
+    paintableRooms: Dict[DungeonRoom, PaintableRoom]
+        A dictionary of paintable wrappers which can be used to store
+        the pixel coordinates of each room.
 
     config: PainterConfig
         The config to use when determining room measurements.
@@ -112,14 +161,22 @@ def plot_map(dungeon: Dungeon, config: PainterConfig) -> Tuple[int, int]:
     imageWidth = (bounds[2] - bounds[0] + 3) * roomSize
     imageHeight = (bounds[3] - bounds[1] + 3) * roomSize + headerSize
 
-    for roomIndex, room in enumerate(dungeon.rooms):
-        room.index = roomIndex
-        room.pixelX = (room.x - bounds[0] + 1) * roomSize
-        room.pixelY = (room.y - bounds[1] + 1) * \
-            roomSize + headerSize
+    for room in dungeon.rooms:
+        p = PaintableRoom(room)
+        p.start = ((room.x - bounds[0] + 1) * roomSize,
+                   (room.y - bounds[1] + 1) *
+                   roomSize + headerSize)
 
-        room.pixelEndX = room.pixelX + roomSize - 1
-        room.pixelEndY = room.pixelY + roomSize - 1
+        p.end = (p.start[0] + roomSize - 1,
+                 p.start[1] + roomSize - 1)
+
+        p.center = (int((p.start[0] + p.end[0]) / 2),
+                    int((p.start[1] + p.end[1]) / 2))
+
+        p.rect = (p.start[0], p.start[1],
+                  p.end[0], p.end[1])
+
+        paintableRooms[room] = p
 
     return imageWidth, imageHeight
 
@@ -146,7 +203,8 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
     if len(config.layers) == 0:
         return
 
-    imageWidth, imageHeight = plot_map(dungeon, config)
+    paintableRooms: Dict[DungeonRoom, PaintableRoom] = {}
+    imageWidth, imageHeight = plot_map(dungeon, paintableRooms, config)
 
     images = []
     for layer in config.layers:
@@ -154,7 +212,7 @@ def create_image(dungeon: Dungeon, config: PainterConfig) -> None:
         images.append(img)
 
         draw = ImageDraw.Draw(img)
-        layer.render_layer(dungeon, img, draw)
+        layer.render_layer(dungeon, paintableRooms, img, draw)
 
     if not config.layeredImage:
         for i in range(1, len(images)):
@@ -252,8 +310,9 @@ class FillLayer(RenderLayer):
 
         self.color = color
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         rect = (0, 0, img.size[0], img.size[1])
@@ -281,15 +340,14 @@ class KeysLayer(RenderLayer):
         self.keyColor = keyColor
         self.keyRadius = keyRadius
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for key in dungeon.keys:
             keyRoom = key.keyLocation
-
-            keyX = (keyRoom.pixelX + keyRoom.pixelEndX) / 2
-            keyY = (keyRoom.pixelY + keyRoom.pixelEndY) / 2
+            keyX, keyY = paintableRooms[keyRoom].center
 
             rect = (keyX - self.keyRadius, keyY - self.keyRadius,
                     keyX + self.keyRadius, keyY + self.keyRadius)
@@ -321,54 +379,59 @@ class WallsLayer(RenderLayer):
         self.wallColor = wallColor
         self.lockColor = lockColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for room in dungeon.rooms:
-            rect = (room.pixelX, room.pixelY, room.pixelEndX, room.pixelEndY)
+            rect = paintableRooms[room].rect
             draw_hollow_rect(draw, rect, self.wallColor)
 
             doorStart = (rect[2] - rect[0] - self.doorSize) / 2
             doorEnd = doorStart + self.doorSize
 
+            s = paintableRooms[room].start
+            e = paintableRooms[room].end
             if room.doors[0]:
-                rect = (room.pixelX, room.pixelY + doorStart,
-                        room.pixelX + 4, room.pixelY + doorEnd)
-                draw.rectangle(rect, fill=(0, 0, 0, 0))
+                r1 = (s[0], s[1] + doorStart,
+                      s[0] + 4, s[1] + doorEnd)
+                draw.rectangle(r1, fill=(0, 0, 0, 0))
 
             if room.doors[1]:
-                rect = (room.pixelX + doorStart, room.pixelY,
-                        room.pixelX + doorEnd, room.pixelY + 4)
-                draw.rectangle(rect, fill=(0, 0, 0, 0))
+                r2 = (s[0] + doorStart, s[1],
+                      s[0] + doorEnd, s[1] + 4)
+                draw.rectangle(r2, fill=(0, 0, 0, 0))
 
             if room.doors[2]:
-                rect = (room.pixelEndX - 4, room.pixelY + doorStart,
-                        room.pixelEndX, room.pixelY + doorEnd)
-                draw.rectangle(rect, fill=(0, 0, 0, 0))
+                r3 = (e[0] - 4, s[1] + doorStart,
+                      e[0], s[1] + doorEnd)
+                draw.rectangle(r3, fill=(0, 0, 0, 0))
 
             if room.doors[3]:
-                rect = (room.pixelX + doorStart, room.pixelEndY - 4,
-                        room.pixelX + doorEnd, room.pixelEndY)
-                draw.rectangle(rect, fill=(0, 0, 0, 0))
+                r4 = (s[0] + doorStart, e[1] - 4,
+                      s[0] + doorEnd, e[1])
+                draw.rectangle(r4, fill=(0, 0, 0, 0))
 
         for room in dungeon.rooms:
             if not (room.lockedDoors[0] or room.lockedDoors[1]):
                 continue
 
-            rect = (room.pixelX, room.pixelY, room.pixelEndX, room.pixelEndY)
-            doorStart = (rect[2] - rect[0] - self.doorSize) / 2
+            paint = paintableRooms[room]
+            doorStart = int(
+                (paint.end[0] - paint.start[0] - self.doorSize) / 2)
             doorEnd = doorStart + self.doorSize
 
+            s = paint.start
             if room.lockedDoors[0]:
-                rect = (room.pixelX - 4 - 2, room.pixelY + doorStart,
-                        room.pixelX + 4, room.pixelY + doorEnd)
-                draw_hollow_rect(draw, rect, self.lockColor)
+                r1 = (s[0] - 4 - 2, s[1] + doorStart,
+                      s[0] + 4, s[1] + doorEnd)
+                draw_hollow_rect(draw, r1, self.lockColor)
 
             if room.lockedDoors[1]:
-                rect = (room.pixelX + doorStart, room.pixelY - 4 - 2,
-                        room.pixelX + doorEnd, room.pixelY + 4)
-                draw_hollow_rect(draw, rect, self.lockColor)
+                r2 = (s[0] + doorStart, s[1] - 4 - 2,
+                      s[0] + doorEnd, s[1] + 4)
+                draw_hollow_rect(draw, r2, self.lockColor)
 
 
 class PathLayer(RenderLayer):
@@ -391,23 +454,25 @@ class PathLayer(RenderLayer):
 
         self.pathColor = pathColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         path = []
         for room in dungeon.mainPath:
-            path.append(((room.pixelX + room.pixelEndX) / 2,
-                         (room.pixelY + room.pixelEndY) / 2))
+            path.append(paintableRooms[room].center)
 
         draw.line(path, fill=self.pathColor, width=3)
-        self.draw_starting_triangle(dungeon.rooms[0], dungeon, draw)
-        self.draw_ending_square(dungeon.rooms[-1], draw)
+        self.draw_starting_triangle(dungeon.rooms[0], dungeon,
+                                    paintableRooms, draw)
+        self.draw_ending_square(dungeon.rooms[-1], paintableRooms, draw)
 
         for sidePath in dungeon.mainPath.sidePaths:
-            self.draw_side_path(sidePath, draw)
+            self.draw_side_path(sidePath, paintableRooms, draw)
 
     def draw_starting_triangle(self, room: DungeonRoom, dungeon: Dungeon,
+                               paintableRooms: Dict[DungeonRoom, PaintableRoom],
                                draw: ImageDraw) -> None:
         """
         Internal function for rendering the starting triangle arrow.
@@ -421,8 +486,7 @@ class PathLayer(RenderLayer):
             The drawing handler.
         """
 
-        c = ((room.pixelX + room.pixelEndX) / 2,
-             (room.pixelY + room.pixelEndY) / 2)
+        c = paintableRooms[room].center
         size = 8
 
         points = []
@@ -449,6 +513,7 @@ class PathLayer(RenderLayer):
         draw.polygon(points, fill=self.pathColor)
 
     def draw_ending_square(self, room: DungeonRoom,
+                           paintableRooms: Dict[DungeonRoom, PaintableRoom],
                            draw: ImageDraw) -> None:
         """
         Internal function for rendering the ending circle.
@@ -462,13 +527,13 @@ class PathLayer(RenderLayer):
             The drawing handler.
         """
 
-        c = ((room.pixelX + room.pixelEndX) / 2,
-             (room.pixelY + room.pixelEndY) / 2)
+        c = paintableRooms[room].center
 
         rect = (c[0] - 8, c[1] - 8, c[0] + 8, c[1] + 8)
         draw_hollow_rect(draw, rect, self.pathColor, thickness=4)
 
     def draw_side_path(self, sidePath: DungeonPath,
+                       paintableRooms: Dict[DungeonRoom, PaintableRoom],
                        draw: ImageDraw) -> None:
         """
         Internal function for rendering a side path starting at a given
@@ -487,15 +552,14 @@ class PathLayer(RenderLayer):
 
         path = []
         for room in sidePath:
-            path.append(((room.pixelX + room.pixelEndX) / 2,
-                         (room.pixelY + room.pixelEndY) / 2))
+            path.append(paintableRooms[room].center)
 
         for i in range(len(path) - 1):
             draw_dotted_line(draw, path[i],
                              path[i + 1], 5, self.pathColor, 2)
 
         for nSidePath in sidePath.sidePaths:
-            self.draw_side_path(nSidePath, draw)
+            self.draw_side_path(nSidePath, paintableRooms, draw)
 
 
 class RoomNumbersLayer(RenderLayer):
@@ -519,8 +583,9 @@ class RoomNumbersLayer(RenderLayer):
         self.font = font
         self.textColor = textColor
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for room in dungeon.rooms:
@@ -529,7 +594,8 @@ class RoomNumbersLayer(RenderLayer):
             if dungeon.is_room_optional(room):
                 roomName += '*'
 
-            draw.text((room.pixelX + 4, room.pixelY + 2),
+            s = paintableRooms[room].start
+            draw.text((s[0] + 4, s[1] + 2),
                       roomName, fill=self.textColor, font=self.font)
 
 
@@ -540,8 +606,9 @@ class RegionLayer(RenderLayer):
     with that region are filled with that color.
     """
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         regionColors = [(0, 0, 0)] * dungeon.region_count()
@@ -552,9 +619,7 @@ class RegionLayer(RenderLayer):
             regionColors[i] = (r, g, b)
 
         for room in dungeon.rooms:
-            rect = (room.pixelX, room.pixelY,
-                    room.pixelEndX, room.pixelEndY)
-
+            rect = paintableRooms[room].rect
             draw.rectangle(rect, fill=regionColors[room.region])
 
 
@@ -585,13 +650,12 @@ class DifficultyLayer(RenderLayer):
         col = 'hsl(' + str((1 - value) * 240) + ', 100%, 50%)'
         return cast(Tuple[int, int, int], ImageColor.getrgb(col))
 
-    def render_layer(self, dungeon: Dungeon, img: Image,
-                     draw: ImageDraw) -> None:
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
         """See RenderLayer for docs."""
 
         for room in dungeon.rooms:
-            rect = (room.pixelX, room.pixelY,
-                    room.pixelEndX, room.pixelEndY)
-
+            rect = paintableRooms[room].rect
             col = self.get_gradient_color(room.difficulty)
             draw.rectangle(rect, fill=col)
