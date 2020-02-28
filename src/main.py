@@ -57,9 +57,13 @@ def get_dungeon_config() -> GeneratorConfig:
     roomType.name = 'Mini Boss'
     dungeonConfig.add_room_type(roomType)
 
-    dungeonConfig.add_layer(DunGEN.BranchingPathLayer((15, 30), (1, 4), 4, 12))
-    dungeonConfig.add_layer(DunGEN.AssignRegionsLayer())
-    dungeonConfig.add_layer(DunGEN.AssignDifficultiesLayer())
+    dungeonConfig.layers = [
+        DunGEN.BranchingPathLayer((15, 30), (1, 4), 4, 12),
+        DunGEN.AssignRegionsLayer(),
+        DunGEN.AssignDifficultiesLayer(),
+        DunGEN.AssignDifficultiesLayer(),
+        DunGEN.AssignRoomTypes(dungeonConfig.roomTypes),
+    ]
 
     return dungeonConfig
 
@@ -76,6 +80,7 @@ def get_painter_config() -> PainterConfig:
         DungeonPainter.RoomNumbersLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR),
         DungeonPainter.PathLayer(PATH_COLOR),
         DungeonPainter.KeysLayer(KEY_COLOR, 8),
+        DungeonPainter.RoomTypeLayer(ROOM_NUMBER_FONT, ROOM_NUMBER_COLOR)
     ]
 
     return painterConfig

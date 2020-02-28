@@ -86,38 +86,6 @@ class GeneratorConfig:
 
         self.roomTypes.append(roomType)
 
-    def random_room(self, search: Callable[[RoomType], bool]) \
-            -> RoomType:
-        """
-        Returns a random room type from this config which matches the
-        given search criteria.
-
-        Parameters
-        ----------
-        search: Callable[RoomType, bool]
-            The search filter to use when deciding what room types can
-            be returned. All room types for which this functions returns
-            true are considered.
-
-        Returns
-        -------
-        A random room type within the given search range, or None if
-        there are no room types which match the search.
-
-        Rasis
-        -----
-        GeneratorError
-            If no room types match the search function.
-        """
-
-        remaining = list(filter(search, self.roomTypes))
-        shuffle(remaining)
-
-        if len(remaining) > 0:
-            return remaining[0]
-
-        raise GeneratorError
-
     def add_layer(self, layer) -> None:  # type: ignore
         """
         Adds a new dungeon processing layer to this config.
@@ -774,3 +742,67 @@ class AssignDifficultiesLayer(DungeonGENLayer):
             d = max(0, min(1, d))
 
             room.difficulty = d
+
+
+class AssignRoomTypes(DungeonGENLayer):
+    """
+    This layer is used to set the room types for each room in the
+    dungeon based on their location.
+    """
+
+    def __init__(self, roomTypes: List[RoomType]) -> None:
+        """
+        Parameters
+        ----------
+        roomTypes: List[RoomType]
+            A list of room types which can be assigned.
+        """
+        self.roomTypes = roomTypes
+
+    def process_dungeon(self, dungeon: Dungeon) -> None:
+        """See DungenGENLayer for docs."""
+
+        dungeon.mainPath.rooms[0].type = self.random_room(
+            lambda x: x.isEntrance)
+
+        dungeon.mainPath.rooms[-1].type = self.random_room(
+            lambda x: x.isExit)
+
+        for room in dungeon.rooms:
+            if room.type is not None:
+                continue
+
+            room.type = self.random_room(
+                lambda x: not x.isEntrance and not x.isExit)
+
+    def random_room(self, search: Callable[[RoomType], bool]) \
+            -> RoomType:
+        """
+        Returns a random room type from this config which matches the
+        given search criteria.
+
+        Parameters
+        ----------
+        search: Callable[RoomType, bool]
+            The search filter to use when deciding what room types can
+            be returned. All room types for which this functions returns
+            true are considered.
+
+        Returns
+        -------
+        A random room type within the given search range, or None if
+        there are no room types which match the search.
+
+        Rasis
+        -----
+        GeneratorError
+            If no room types match the search function.
+        """
+
+        remaining = list(filter(search, self.roomTypes))
+
+        count = len(remaining)
+        if count > 0:
+            return remaining[rand(count)]
+
+        raise GeneratorError

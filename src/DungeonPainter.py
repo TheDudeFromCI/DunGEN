@@ -674,3 +674,85 @@ class DifficultyLayer(RenderLayer):
             rect = paintableRooms[room].rect
             col = self.get_gradient_color(room.difficulty)
             draw.rectangle(rect, fill=col)
+
+
+class RoomTypeLayer(RenderLayer):
+    """
+    The room type layer can be used to visualize the room types for each
+    room in the dungeon. The name of the room type is printed in the
+    bottom left corner of the room.
+    """
+
+    def __init__(self, font: ImageFont, color: Tuple[int, int, int]) \
+            -> None:
+        """
+        Parameters
+        ----------
+        font: ImageFont
+            The font to use when rendering the text.
+
+        color: Tuple
+            The color of the text.
+        """
+
+        self.font = font
+        self.color = color
+
+    def render_layer(self, dungeon: Dungeon,
+                     paintableRooms: Dict[DungeonRoom, PaintableRoom],
+                     img: Image, draw: ImageDraw) -> None:
+        """See RenderLayer for docs."""
+
+        for room in dungeon.rooms:
+            if room.type is None:
+                continue
+
+            text, lines = self.word_wrap(room.type.name,
+                                         paintableRooms[room].size - 8)
+
+            w, h = self.font.getsize(text)
+
+            r = paintableRooms[room].rect
+            draw.multiline_text((r[0] + 4, r[3] - h * lines - 2),
+                                text, fill=self.color, font=self.font)
+
+    def word_wrap(self, text: str, size: int) -> Tuple[str, int]:
+        """
+        Adds newline characters within a block of text based on the
+        width of the text, in order to make it fit within the width of
+        the room bounds.
+
+        Parameters
+        ----------
+        text: str
+            The text to word wrap.
+
+        size: int
+            The maximum width of the text in pixels.
+
+        Returns
+        -------
+        A tuple containing the wrapped text and an int representing the
+        number of lines.
+        """
+
+        words = text.split(' ')
+
+        lines = 1
+        output = ''
+        for i in range(len(words)):
+            n = output
+            if n != '':
+                n += ' '
+            n += words[i]
+
+            w, h = self.font.getsize(n)
+
+            if w >= size:
+                output += '\n'
+                output += words[i]
+                lines += 1
+            else:
+                output = n
+
+        return output, lines
