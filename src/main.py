@@ -7,6 +7,9 @@ import DunGEN
 from DunGEN import GeneratorConfig, RoomType
 from DungeonPainter import PainterConfig
 
+import BasicDungeonDesign
+
+
 BACKGROUND_COLOR = (13, 13, 13)
 WALL_COLOR = (77, 77, 77)
 ROOM_NUMBER_COLOR = (48, 48, 48)
@@ -31,31 +34,7 @@ def open_image(filename: str) -> None:
 def get_dungeon_config() -> GeneratorConfig:
     dungeonConfig = GeneratorConfig()
 
-    roomType = RoomType()
-    roomType.name = 'Downward Stairway Entrance'
-    roomType.isEntrance = True
-    dungeonConfig.add_room_type(roomType)
-
-    roomType = RoomType()
-    roomType.name = 'Boss'
-    roomType.isExit = True
-    dungeonConfig.add_room_type(roomType)
-
-    roomType = RoomType()
-    roomType.name = 'Spiked Ball Trap'
-    dungeonConfig.add_room_type(roomType)
-
-    roomType = RoomType()
-    roomType.name = 'Timing Puzzle'
-    dungeonConfig.add_room_type(roomType)
-
-    roomType = RoomType()
-    roomType.name = 'Block Puzzle'
-    dungeonConfig.add_room_type(roomType)
-
-    roomType = RoomType()
-    roomType.name = 'Mini Boss'
-    dungeonConfig.add_room_type(roomType)
+    dungeonConfig.roomTypes = BasicDungeonDesign.get_room_types()
 
     dungeonConfig.layers = [
         DunGEN.BranchingPathLayer((15, 30), (1, 4), 4, 12),
