@@ -43,6 +43,22 @@ class RoomType:
 
     isExit: bool
         Whether or not this room is allowed to be used as an exit room.
+
+    difficulty: float
+        The difficulty cost of this room. If a room's difficulty exceeds
+        this value, it cannot use this room type. A room type's
+        difficulty is subtracted from the base difficulty, while
+        remaining difficulty is allocated towards enemies and similar
+        entities.
+
+    priority: int
+        The randomization weight of applying this room type to a room.
+        Room types with a higher priority are more likely to be
+        selected. Priority must be at least 1.
+
+    requiresEnemy: bool
+        If true, this room must have at least one enemy added to it in
+        order for it to be placed.
     """
 
     def __init__(self) -> None:
@@ -51,6 +67,9 @@ class RoomType:
         self.maxDoors = 4
         self.isEntrance = False
         self.isExit = False
+        self.difficulty = 0.0
+        self.priority = 1
+        self.requiresEnemy = False
 
 
 class GeneratorConfig:
@@ -141,7 +160,9 @@ class DungeonRoom:
         A value between 0 and 1, inclusive, which represents how
         difficult the room is. This value is relative to the rest of the
         dungeon. The starting room of a dungeon always has a value of 0,
-        while the final room always has a value of 1.
+        while the final room always has a value of 1. If no room type
+        exists with a difficulty lower than the base difficulty, the
+        room type with the lowest difficulty is selected.
 
     region: int
         The region index of this room. A region is a group of rooms
@@ -772,8 +793,23 @@ class AssignRoomTypes(DungeonGENLayer):
             if room.type is not None:
                 continue
 
-            room.type = self.random_room(
-                lambda x: not x.isEntrance and not x.isExit)
+            try:
+                room.type = self.random_room(
+                    lambda x: not x.isEntrance
+                    and not x.isExit
+                    and x.difficulty <= room.difficulty)
+
+            except GeneratorError:
+                available = list(filter(lambda x: not x.isEntrance
+                                        and not x.isExit, self.roomTypes))
+
+                if len(available) == 0:
+                    raise GeneratorError
+
+                room.type = available[0]
+                for roomType in available:
+                    if roomType.difficulty < room.type.difficulty:
+                        room.type = roomType
 
     def random_room(self, search: Callable[[RoomType], bool]) \
             -> RoomType:
@@ -801,8 +837,13 @@ class AssignRoomTypes(DungeonGENLayer):
 
         remaining = list(filter(search, self.roomTypes))
 
-        count = len(remaining)
+        weighted: List[RoomType] = []
+        for room in remaining:
+            for c in range(room.priority):
+                weighted.append(room)
+
+        count = len(weighted)
         if count > 0:
-            return remaining[rand(count)]
+            return weighted[rand(count)]
 
         raise GeneratorError
