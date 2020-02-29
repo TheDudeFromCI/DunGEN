@@ -713,14 +713,48 @@ class AssignRegionsLayer(DungeonGENLayer):
     def process_dungeon(self, dungeon: Dungeon) -> None:
         """See DungenGENLayer for docs."""
 
-        region = 0
-        depth = 0
         for room in dungeon.rooms:
-            if room.depth < depth:
-                region += 1
-                depth = room.depth
+            room.region = -1
 
-            room.region = region
+        dungeon.mainPath.rooms[0].region = 0
+
+        changed = True
+        while changed:
+            changed = False
+
+            for room in dungeon.rooms:
+                if room.region > -1:
+                    continue
+
+                for near in [(room.x - 1, room.y, 0),
+                             (room.x, room.y - 1, 1),
+                             (room.x + 1, room.y, 2),
+                             (room.x, room.y + 1, 3)]:
+
+                    x = near[0]
+                    y = near[1]
+                    d = near[2]
+
+                    if not room.doors[d]:
+                        continue
+
+                    n = dungeon.get_room_at(x, y)
+                    if n is None:
+                        continue
+
+                    if n.region == -1:
+                        continue
+
+                    for key in dungeon.keys:
+                        if key.lockLocation == n:
+                            if key.lockedDoor == (d + 2) % 4:
+                                room.region = n.region + 1
+                                changed = True
+                                break
+
+                    if room.region == -1:
+                        room.region = n.region
+                        changed = True
 
 
 class AssignDifficultiesLayer(DungeonGENLayer):

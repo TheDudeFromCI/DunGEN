@@ -48,7 +48,7 @@ def get_dungeon_config() -> GeneratorConfig:
 
 def get_painter_config() -> PainterConfig:
     painterConfig = PainterConfig()
-    painterConfig.layeredImage = False
+    painterConfig.layeredImage = True
 
     painterConfig.layers = [
         DungeonPainter.FillLayer(BACKGROUND_COLOR),
