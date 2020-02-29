@@ -636,7 +636,6 @@ class RegionLayer(RenderLayer):
         for room in dungeon.rooms:
             rect = paintableRooms[room].rect
             draw.rectangle(rect, fill=regionColors[room.region])
-            print(room.region)
 
 
 class DifficultyLayer(RenderLayer):

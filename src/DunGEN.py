@@ -72,6 +72,54 @@ class RoomType:
         self.requiresEnemy = False
 
 
+class EnemyType:
+    """
+    An enemy type is used to tell the dungeon what enemies should be
+    placed within a room.
+
+    Attributes
+    ----------
+    name: str
+        The name of the enemy type.
+
+    priority: int
+        The randomization weight of add this enemy type to a room. Enemy
+        types with a higher priority are more likely to be selected.
+        Priority must be at least 1.
+
+    difficulty: float
+        The difficulty cost of this enemy.
+
+    maxCount: int
+        The maximum number of this enemy type which can be placed in a
+        single room.
+
+    endOfRegion: bool
+        If true, this enemy type can only be placed in the last room
+        within a region. (The room where a key is located for unlocking
+        the next region, or the exit room itself.)
+
+    requiresEnemy: List[str]
+        If this list is not empty, this enemy cannot be spawned in a
+        room unless at least one of these enemies is present. Enemies
+        are defined by name.
+
+    requiresRoom: List[str]
+        If this list is not empty, this enemy cannot be spawned in a
+        room unless the room type is in this list. Room types are
+        defined by name.
+    """
+
+    def __init__(self) -> None:
+        self.name = 'Unnamed Enemy'
+        self.priority = 1
+        self.difficulty = 0.0
+        self.maxCount = 8
+        self.endOfRegion = False
+        self.requiresEnemy: List[str] = []
+        self.requiresRoom: List[str] = []
+
+
 class GeneratorConfig:
     """
     The generator config can be used to configure how dungeons should be
@@ -84,6 +132,9 @@ class GeneratorConfig:
     roomTypes: List[RoomType]
         A list of room types which can exist within the dungeon.
 
+    enemyTypes: List[EnemyType]
+        A list of enemy types which can exist within the dungeon.
+
     layers: List[DungeonGENLayer]
         A list of generation layers which should be used to generate
         the dungeon.
@@ -91,31 +142,8 @@ class GeneratorConfig:
 
     def __init__(self) -> None:
         self.roomTypes: List[RoomType] = []
+        self.enemyTypes: List[EnemyType] = []
         self.layers: List[DungeonGENLayer] = []
-
-    def add_room_type(self, roomType: RoomType) -> None:
-        """
-        Adds a new room type to the this config.
-
-        Parameters
-        ----------
-        roomType: RoomType
-            The room type to add.
-        """
-
-        self.roomTypes.append(roomType)
-
-    def add_layer(self, layer) -> None:  # type: ignore
-        """
-        Adds a new dungeon processing layer to this config.
-
-        Parameters
-        ----------
-        layer: DungeonGENLayer
-            The layer to add.
-        """
-
-        self.layers.append(layer)
 
 
 class DungeonRoom:
@@ -147,7 +175,7 @@ class DungeonRoom:
 
     depth: int
         If a dungeon uses backtracking to retrieve keys or items, side
-        paths are given a depth of +1 from the depth of the room they
+        paths are given a depth of + 1 from the depth of the room they
         branched off from. The main path always has a depth of 0.
 
     type: Optional[RoomType]
@@ -170,6 +198,9 @@ class DungeonRoom:
         door. A room's region number is equal to the smallest number of
         locked rooms that must be crossed to reach from the starting
         room.
+
+    enemies: List[EnemyType]
+        A list of all enemies which are located within this room.
     """
 
     def __init__(self) -> None:
@@ -181,17 +212,18 @@ class DungeonRoom:
         self.type: Optional[RoomType] = None
         self.difficulty = 0.0
         self.region = 0
+        self.enemies: List[EnemyType] = []
 
     def direction_to(self, room: 'DungeonRoom') -> int:
         """
         Returns the directional value, 0 - 3, when moving from this room
-        to the next room. If the rooms are not touching, a value of -1
+        to the next room. If the rooms are not touching, a value of - 1
         is returned.
 
         Returns
         -------
         The directional value, or -1 if the rooms are not touching. A
-        value of -1 is also returned if the room is undefined.
+        value of - 1 is also returned if the room is undefined.
         """
 
         if room == None:
@@ -236,6 +268,32 @@ class DungeonRoom:
 
         if door == 3:
             self.doors = (d[0], d[1], d[2], state)
+
+    def has_room_for(self, enemy: EnemyType) -> bool:
+        """
+        Checks if there is enough space in this room for another
+        instance of a given enemy type. The enemy's max count attribute
+        is taken into consideration as well as the enemies within this
+        room.
+
+        Parameters
+        ----------
+        enemy: EnemyType
+            The enemy type to check for.
+
+        Returns
+        -------
+        True if at least one more instance of the given enemy type can
+        be added to this room. False otherwise.
+        """
+
+        count = 0
+
+        for e in self.enemies:
+            if e == enemy:
+                count += 1
+
+        return count < enemy.maxCount
 
 
 class DungeonKey:
@@ -489,6 +547,27 @@ class Dungeon:
 
         return True
 
+    def is_end_of_region(self, room: DungeonRoom) -> bool:
+        """
+        This method checks if a given room is the last room within a
+        region or not.
+
+        Parameters
+        ----------
+        room: DungeonRoom
+            The room to check.
+
+        Returns
+        -------
+        True if this room has a key in it, or is the exit room.
+        """
+
+        for key in self.keys:
+            if key.lockLocation == room:
+                return True
+
+        return room == self.mainPath.rooms[-1]
+
 
 class DungeonGENLayer(metaclass=ABCMeta):
     """
@@ -623,7 +702,7 @@ class BranchingPathLayer(DungeonGENLayer):
             How deep the path should be. This is used internally for
             counting depth while running recursively. This is the depth
             value assigned to all rooms which are generated by this path.
-            Nested paths use a depth of +1 for each recursive layer.
+            Nested paths use a depth of + 1 for each recursive layer.
 
         Returns
         -------
@@ -766,6 +845,22 @@ class AssignDifficultiesLayer(DungeonGENLayer):
 
     def __init__(self, dropoff: float, noise: float,
                  startingPoints: float) -> None:
+        """
+        Parameters
+        ----------
+        dropoff: float
+            The percentage of difficulty of a room after entering a new
+            region.
+
+        noise: float
+            How much noise to add to the difficulty after calculating
+            the value, to encourage more diversity in rooms.
+
+        startingPoints: float
+            The starting difficulty percentage for room 0, to ensure
+            early rooms aren't completely empty.
+        """
+
         self.dropoff = dropoff
         self.noise = noise
         self.startingPoints = startingPoints
@@ -857,15 +952,14 @@ class AssignRoomTypes(DungeonGENLayer):
 
         Parameters
         ----------
-        search: Callable[RoomType, bool]
+        search: Callable[[RoomType], bool]
             The search filter to use when deciding what room types can
             be returned. All room types for which this functions returns
             true are considered.
 
         Returns
         -------
-        A random room type within the given search range, or None if
-        there are no room types which match the search.
+        A random room type within the given search range.
 
         Rasis
         -----
@@ -879,6 +973,146 @@ class AssignRoomTypes(DungeonGENLayer):
         for room in remaining:
             for c in range(room.priority):
                 weighted.append(room)
+
+        count = len(weighted)
+        if count > 0:
+            return weighted[rand(count)]
+
+        raise GeneratorError
+
+
+class EnemiesLayer(DungeonGENLayer):
+    """
+    This layer is used to add enemies to a dungeon based on the
+    remaining difficulty score of a room after the room type is taken
+    into consideration.
+    """
+
+    def __init__(self, enemyTypes: List[EnemyType]) -> None:
+        """
+        Parameters
+        ----------
+        enemyTypes: List[EnemyType]
+            A list of enemy types which can be placed.
+        """
+
+        self.enemyTypes = enemyTypes
+
+    def process_dungeon(self, dungeon: Dungeon) -> None:
+        """See DungenGENLayer for docs."""
+
+        for room in dungeon.rooms:
+            if room.type is None:
+                continue
+
+            if room.type.isEntrance or room.type.isExit:
+                continue
+
+            diff = room.difficulty - room.type.difficulty
+
+            while diff > 0:
+                try:
+                    enemy = self.random_enemy(lambda x:
+                                              x.difficulty <= diff
+                                              and room.has_room_for(x)
+                                              and (not x.endOfRegion or dungeon.is_end_of_region(room))
+                                              and self.meets_enemy_requirements(x, room)
+                                              and self.meets_room_type_requirements(x, room))
+
+                    room.enemies.append(enemy)
+                    diff -= enemy.difficulty
+
+                except:
+                    break
+
+            print("Room", room.index, "Enemies:")
+            for enemy in room.enemies:
+                print("  " + enemy.name)
+
+    def meets_enemy_requirements(self, enemy: EnemyType, room: DungeonRoom) -> bool:
+        """
+        Checks if the given enemy depends on another enemy being present
+        or not. If so, checks if that enemy is within the room.
+
+        Parameters
+        ----------
+        enemy: EnemyType
+            The enemy to check.
+
+        room: DungeonRoom
+            The room to check.
+
+        Returns
+        -------
+        True if this enemy has no enemy dependencies, or if it does have
+        a dependency, makes sure that enemy is within the room.
+        """
+
+        if len(enemy.requiresEnemy) == 0:
+            return True
+
+        for en in room.enemies:
+            if en.name in enemy.requiresEnemy:
+                return True
+
+        return False
+
+    def meets_room_type_requirements(self, enemy: EnemyType, room: DungeonRoom) -> bool:
+        """
+        Checks if the given enemy depends on a certain room type being
+        used. If so, checks if the room matches that type.
+
+        Parameters
+        ----------
+        enemy: EnemyType
+            The enemy to check.
+
+        room: DungeonRoom
+            The room to check.
+
+        Returns
+        -------
+        True if this enemy has no room dependencies, or if it does have
+        a dependency, makes sure that the room matches that type.
+        """
+
+        if len(enemy.requiresRoom) == 0:
+            return True
+
+        if room.type is None:
+            return False
+
+        return room.type.name in enemy.requiresRoom
+
+    def random_enemy(self, search: Callable[[EnemyType], bool]) \
+            -> EnemyType:
+        """
+        Returns a random enemy type from this config which matches the
+        given search criteria.
+
+        Parameters
+        ----------
+        search: Callable[[EnemyType], bool]
+            The search filter to use when deciding what enemy types can
+            be returned. All enemy types for which this functions
+            returns true are considered.
+
+        Returns
+        -------
+        A random enemy type within the given search range.
+
+        Rasis
+        -----
+        GeneratorError
+            If no enemy types match the search function.
+        """
+
+        remaining = list(filter(search, self.enemyTypes))
+
+        weighted: List[EnemyType] = []
+        for enemy in remaining:
+            for c in range(enemy.priority):
+                weighted.append(enemy)
 
         count = len(weighted)
         if count > 0:

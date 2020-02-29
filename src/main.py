@@ -35,12 +35,14 @@ def get_dungeon_config() -> GeneratorConfig:
     dungeonConfig = GeneratorConfig()
 
     dungeonConfig.roomTypes = BasicDungeonDesign.get_room_types()
+    dungeonConfig.enemyTypes = BasicDungeonDesign.get_enemy_types()
 
     dungeonConfig.layers = [
         DunGEN.BranchingPathLayer((15, 30), (1, 4), 4, 12),
         DunGEN.AssignRegionsLayer(),
         DunGEN.AssignDifficultiesLayer(2/3, 0.05, 0.1),
         DunGEN.AssignRoomTypes(dungeonConfig.roomTypes),
+        DunGEN.EnemiesLayer(dungeonConfig.enemyTypes)
     ]
 
     return dungeonConfig
