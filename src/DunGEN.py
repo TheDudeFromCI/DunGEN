@@ -730,8 +730,11 @@ class AssignDifficultiesLayer(DungeonGENLayer):
     progression is made throughout the dungeon.
     """
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, dropoff: float, noise: float,
+                 startingPoints: float) -> None:
+        self.dropoff = dropoff
+        self.noise = noise
+        self.startingPoints = startingPoints
 
     def process_dungeon(self, dungeon: Dungeon) -> None:
         """See DungenGENLayer for docs."""
@@ -749,17 +752,18 @@ class AssignDifficultiesLayer(DungeonGENLayer):
 
         diff -= 1
         regionValues[-1] = diff
-        c = 2 / 3
 
         for room in dungeon.rooms:
             x1 = regionValues[room.region]
             x2 = regionValues[room.region + 1]
             n = room.difficulty
 
-            d = (((n - x1) / (x2 - x1)) ** 2) * (x2 - c * x1) + c * x1
-            d /= diff
+            d = (((n - x1) / (x2 - x1)) ** 2) * \
+                (x2 - self.dropoff * x1) + self.dropoff * x1
+            d = (d / diff) * (1 - self.startingPoints) \
+                + self.startingPoints
 
-            d += random() * 0.05 - 0.025
+            d += random() * 2 * self.noise - self.noise
             d = max(0, min(1, d))
 
             room.difficulty = d
