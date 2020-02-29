@@ -61,7 +61,6 @@ def get_dungeon_config() -> GeneratorConfig:
         DunGEN.BranchingPathLayer((15, 30), (1, 4), 4, 12),
         DunGEN.AssignRegionsLayer(),
         DunGEN.AssignDifficultiesLayer(),
-        DunGEN.AssignDifficultiesLayer(),
         DunGEN.AssignRoomTypes(dungeonConfig.roomTypes),
     ]
 
